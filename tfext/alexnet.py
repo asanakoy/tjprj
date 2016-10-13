@@ -44,6 +44,10 @@ class Alexnet(object):
         self.num_layers_to_init = num_layers_to_init
         tr_vars = dict()
 
+        if len(self.input_shape) == 2:
+            self.input_shape += (3,)
+
+        assert len(self.input_shape) == 3
         if self.num_layers_to_init > 8 or self.num_layers_to_init < 0:
             raise ValueError('Number of layer to init must be in [0, 8] ({} provided)'.
                              format(self.num_layers_to_init))
@@ -194,10 +198,10 @@ class Alexnet(object):
                                       kernel_height, kernel_width,
                                       num_input_channels / group, kernels_num)
             layer_index += 1
-            conv5_in = Alexnet.conv(conv4, tr_vars['conv5w'], tr_vars['conv5b'],
+            self.conv5 = Alexnet.conv(conv4, tr_vars['conv5w'], tr_vars['conv5b'],
                                     kernel_height, kernel_width,
                                     kernels_num, s_h, s_w, padding="SAME", group=group)
-            conv5 = tf.nn.relu(conv5_in)
+            self.conv5_relu = tf.nn.relu(self.conv5)
 
             # maxpool5
             # max_pool(3, 3, 2, 2, padding='VALID', name='pool5')
@@ -206,18 +210,19 @@ class Alexnet(object):
             s_h = 2
             s_w = 2
             padding = 'VALID'
-            maxpool5 = tf.nn.max_pool(conv5, ksize=[1, kernel_height, kernel_width, 1],
-                                      strides=[1, s_h, s_w, 1], padding=padding)
+            self.maxpool5 = tf.nn.max_pool(self.conv5_relu,
+                                           ksize=[1, kernel_height, kernel_width, 1],
+                                           strides=[1, s_h, s_w, 1], padding=padding)
 
             # fc6
             # fc(4096, name='fc6')
-            num_inputs = int(np.prod(maxpool5.get_shape()[1:]))
+            num_inputs = int(np.prod(self.maxpool5.get_shape()[1:]))
             num_outputs = 4096
             tr_vars['fc6w'], tr_vars['fc6b'] = \
                 self.get_fc_weights(layer_index, net_data, num_inputs, num_outputs)
             layer_index += 1
             self.fc6 = tf.matmul(
-                tf.reshape(maxpool5, [-1, int(np.prod(maxpool5.get_shape()[1:]))]),
+                tf.reshape(self.maxpool5, [-1, int(np.prod(self.maxpool5.get_shape()[1:]))]),
                 tr_vars['fc6w']) + tr_vars['fc6b']
             self.fc6_relu = tf.nn.relu(self.fc6, name='fc6_relu')
 
