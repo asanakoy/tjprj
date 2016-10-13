@@ -1,0 +1,86 @@
+# Copyright (c) 2016 Artsiom Sanakoyeu
+import numpy as np
+import time
+import os
+from alexnet_classes import class_names
+from scipy.misc import imread
+import tensorflow as tf
+import tfext.alexnet
+
+MODELS_DIR = '/export/home/asanakoy/workspace/tfprj/data'
+DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
+
+
+def test_feed_forward(net):
+    print 'test_feed_forward'
+    batch = np.zeros((5, 227, 227, 3), dtype=np.float)
+    for i in xrange(5):
+        im = (imread(os.path.join(DATA_DIR, "{}.png".format(i + 1)))[:, :, :3]).astype(
+            np.float32)
+        im = im - np.mean(im)
+        batch[i, ...] = im
+    batch = batch[:, :, :, ::-1]  # MAKE BGR!
+
+    t = time.time()
+    output = net.sess.run(net.prob, feed_dict={net.x: batch})
+    for input_im_ind in range(output.shape[0]):
+        inds = np.argsort(output)[input_im_ind, :]
+        print "Image", input_im_ind
+        print 'class {}'.format(inds[-1])
+        for i in range(5):
+            print class_names[inds[-1 - i]], output[input_im_ind, inds[-1 - i]]
+    print time.time() - t
+
+
+if __name__ == '__main__':
+    params = {
+        'init_model': os.path.join(MODELS_DIR, 'bvlc_alexnet.npy'),
+        'num_classes': 1000,
+        'device_id': '/gpu:0',
+        'num_layers_to_init': 8,
+        'im_shape': (227, 227, 3)
+    }
+
+    net = tfext.alexnet.Alexnet(**params)
+
+    cross_entropy = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(net.fc8, net.y_gt))
+    train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
+    # train_step = tf.train.AdagradOptimizer(1e-4).minimize(cross_entropy)
+    correct_prediction = tf.equal(tf.cast(tf.argmax(net.prob, 1), tf.int32), net.y_gt)
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+    net.sess.run(tf.initialize_all_variables())
+
+    test_feed_forward(net)
+
+    batch = np.zeros((5, 227, 227, 3), dtype=np.float)
+    for i in xrange(5):
+        im = (imread(os.path.join(DATA_DIR, "{}.png".format(i + 1)))[:, :, :3]).astype(np.float32)
+        im = im - np.mean(im)
+        batch[i, ...] = im
+    batch = batch[:, :, :, ::-1]
+
+    for i in range(20):
+        # batch = np.random.random((10, 227, 227, 3))
+        y = [205, 344, 356, 1, 84]
+        # y = label_binarize(y, classes=range(1000))
+
+        if i % 1 == 0:
+            train_accuracy = accuracy.eval(session=net.sess,
+                                           feed_dict={
+                                               net.x: batch,
+                                               net.y_gt: y,
+                                               net.fc6_keep_prob: 1.0,
+                                               net.fc7_keep_prob: 1.0})
+            print("step %d, training accuracy %f" % (i, train_accuracy))
+
+
+        train_step.run(session=net.sess,
+                       feed_dict={net.x: batch,
+                                  net.y_gt: y,
+                                  net.fc6_keep_prob: 0.5,
+                                  net.fc7_keep_prob: 0.5})
+
+
+    # print("test accuracy %g" % accuracy.eval(feed_dict={
+    #     x: mnist.test.images, y_: mnist.test.labels, keep_prob: 1.0}))
+    pass
