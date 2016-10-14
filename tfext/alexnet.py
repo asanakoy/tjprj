@@ -267,8 +267,12 @@ class Alexnet(object):
                 self.prob = tf.nn.softmax(self.fc8, name='prob')
 
         self.trainable_vars = tr_vars
-        self.sess = tf.Session(config=tf.ConfigProto(log_device_placement=False,
-                                                     allow_soft_placement=True))
+        config = tf.ConfigProto(log_device_placement=False,
+                                allow_soft_placement=True)
+        # please do not use the totality of the GPU memory.
+        config.gpu_options.allow_growth = True
+        # config.gpu_options.per_process_gpu_memory_fraction = 0.27
+        self.sess = tf.Session(config=config)
 
     def get_conv_weights(self, layer_index, net_data, kernel_height, kernel_width,
                          num_input_channels, kernels_num):
