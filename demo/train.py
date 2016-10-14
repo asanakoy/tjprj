@@ -8,6 +8,7 @@ from __future__ import print_function
 
 import os.path
 import time
+import sys
 
 import tensorflow as tf
 import h5py
@@ -17,10 +18,6 @@ import tfext.alexnet
 import tfext.utils
 import batch_loader
 import matplotlib.pyplot as plt
-from collections import OrderedDict
-
-FLAGS = tf.app.flags.FLAGS
-tf.app.flags.DEFINE_integer('gpu', '0', 'Gpu id to use')
 
 
 def get_pathes(category, dataset):
@@ -71,11 +68,14 @@ def run_training(**params):
 
         # Add the Op to compare the logits to the labels during correct_classified_top1.
         eval_correct_top1 = network_spec.correct_classified_top1(logits, net.y_gt)
-        summary = tf.merge_all_summaries()
+        accuracy = tf.cast(eval_correct_top1, tf.float32) / \
+                   tf.constant(params['batch_size'], dtype=tf.float32)
+
         saver = tf.train.Saver()
 
         # Instantiate a SummaryWriter to output summaries and the Graph of the current sesion.
         summary_writer = tf.train.SummaryWriter(params['output_dir'], net.sess.graph)
+        summary = tf.scalar_summary(['loss', 'batch_accuracy'], [loss, accuracy])
 
         net.sess.run(tf.initialize_all_variables())
 
@@ -83,6 +83,7 @@ def run_training(**params):
 
         plotter = Plotter(2, 2)
         log_step = 1
+        summary_step = 200
         for step in xrange(params['max_iter']):
             start_time = time.time()
 
@@ -97,23 +98,19 @@ def run_training(**params):
             # inspect the values of your Ops or variables, you may include them
             # in the list passed to sess.run() and the value tensors will be
             # returned in the tuple from the call.
-            _, loss_value = net.sess.run([train_op, loss], feed_dict=feed_dict)
+            if step % summary_step == 0:
+                summary_str, _, loss_value = net.sess.run([summary, train_op, loss],
+                                                          feed_dict=feed_dict)
+                summary_writer.add_summary(summary_str, step)
+                # summary_writer.flush()
+            else:
+                _, loss_value = net.sess.run([train_op, loss], feed_dict=feed_dict)
             duration = time.time() - start_time
 
-            # Write the summaries and print an overview fairly often.
-            if step % log_step == 0:
-                # data = OrderedDict()
-
-                # data['loss'] = loss_value
-                # plotter.plot(step, data)
-                # Update the events file.
-                summary_str = net.sess.run(summary, feed_dict=feed_dict)
-                summary_writer.add_summary(summary_str, step)
-                summary_writer.flush()
-
-            if (step + 1) % params['snapshot_iter'] == 0 or (step + 1) == params['max_iter']:
+            if step != 0 and \
+                    (step + 1 % params['snapshot_iter'] == 0 or step + 1 == params['max_iter']):
                 checkpoint_file = os.path.join(params['output_dir'], 'checkpoint')
-                saver.save(net.sess, checkpoint_file, global_step=step)
+                saver.save(net.sess, checkpoint_file, global_step=step + 1)
                 # Evaluate against the training set.
                 print('Training Data Eval:')
                 tfext.utils.calc_acuracy(net, net.sess,
@@ -123,13 +120,20 @@ def run_training(**params):
                                          num_images=1000)
 
             duration_full = time.time() - start_time
-            if step % log_step == 0:
-                print('Step %d: loss = %.2f (%.3f s) (full: %.3f s)' % (step, loss_value,
-                                                                        duration, duration_full))
+            if step % log_step == 0 or step + 1 == params['max_iter']:
+                print('Step %d: loss = %.2f (%.3f s, %.2f im/s) (full: %.3f s)'
+                      % (step, loss_value, duration,
+                         params['batch_size'] / duration, duration_full))
+    net.sess.close()
 
 
-def main(_):
-    category = 'long_jump'
+def main(argv):
+    if len(argv) == 0:
+        argv = ['0']
+    if len(argv) > 1:
+        category = argv[1]
+    else:
+        category = 'vault'
     dataset = 'OlympicSports'
 
     data_path, indices_dir, output_dir = get_pathes(category, dataset)
@@ -160,10 +164,10 @@ def main(_):
         'seed': 1988,
         'output_dir': output_dir,
         'init_model': get_first_model_path(dataset),
-        'device_id': '/gpu:{}'.format(FLAGS.gpu)
+        'device_id': '/gpu:{}'.format(int(argv[0]))
     }
     run_training(**params)
 
 
 if __name__ == '__main__':
-    tf.app.run()
+    main(sys.argv[1:])
