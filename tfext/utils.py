@@ -1,6 +1,5 @@
 # Artsiom Sanakoyeu, 2016
-import tensorflow as tf
-from sklearn.preprocessing import label_binarize
+from __future__ import division
 
 
 def fill_feed_dict(net, batch_loader, batch_size=128, phase='test'):
@@ -76,6 +75,6 @@ def calc_acuracy(net,
     # restore the internal pointer
     batch_loader._cur = old_batch_loader_position
 
-    accuracy = true_count / num_examples
+    accuracy = float(true_count) / num_examples
     print('  Num examples: %d  Num correct: %d Accuracy @ 1: %0.04f' %
           (num_examples, true_count, accuracy))
