@@ -7,6 +7,7 @@ from __future__ import division
 import os.path
 from os.path import join
 import time
+import sys
 
 import tensorflow as tf
 import h5py
@@ -87,7 +88,7 @@ def compute_sim(norm_method='zscores', **params):
 
     sim_matrix = spdis.squareform(spdis.pdist(stacked['features'], metric='correlation'))
     sim_matrix_flip = spdis.cdist(stacked['features'], stacked['features_flipped'],
-                                 metric='correlation')
+                                  metric='correlation')
     sim_matrix = np.float32(2 - sim_matrix)
     sim_matrix_flip = np.float32(2 - sim_matrix_flip)
 
@@ -138,14 +139,19 @@ def extract_features(flipped, **params):
                 d[layer_name][batch_idxs, ...] = features[tensor_id].reshape(len(batch_idxs),
                                                                              -1)
             duration = time.time() - start_time
-            print 'Batch {} ({} images)({:.3f} s)'.format(step + 1, batch.shape[0], duration)
+            print 'Batch {} ({} images)({:.3f} s, {:.2f} im/s)'. \
+                format(step + 1, batch.shape[0], duration, params['batch_size'] / duration)
             cnt_images += len(batch_idxs)
             step += 1
+        net.sess.close()
         return d
 
 
-def main(_):
-    category = 'long_jump'
+def main(argv):
+    if len(argv) > 1:
+        category = argv[1]
+    else:
+        category = 'tennis_serve'
     model_name = 'tf_0.1conv_1fc'
     mat_path = '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/OlympicSports/crops/' + category + '/images_test.mat'
 
@@ -157,14 +163,14 @@ def main(_):
     mean = np.load(mean_path)
     num_classes = get_num_classes(train_indices_path)
 
-    iter = 17999
-    init_model = '/export/home/asanakoy/tmp/tf_test/run_18000_0.1conv_1fc/checkpoint-{}'. \
-        format(iter)
+    iteration = 20000
+    init_model = '/export/home/asanakoy/tmp/tf_test/tennis_serve/checkpoint-{}'. \
+        format(iteration)
 
     params = {
         'category': category,
         'model_name': model_name,
-        'iter': iter,
+        'iter': iteration,
         'layer_names': ['fc7'],
         'image_getter': ImageGetterFromMat(mat_path),
         'mean': mean,
@@ -175,10 +181,10 @@ def main(_):
 
         'sim_output_dir': join(
             '/export/home/asanakoy/workspace01/datasets/OlympicSports/sim/tf', category),
-        'device_id': '/gpu:{}'.format(FLAGS.gpu)
+        'device_id': '/gpu:{}'.format(int(argv[0]))
     }
     compute_sim(**params)
 
 
 if __name__ == '__main__':
-    tf.app.run()
+    main(sys.argv[1:])
