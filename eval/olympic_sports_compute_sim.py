@@ -164,8 +164,8 @@ def main(argv):
     num_classes = get_num_classes(train_indices_path)
 
     iteration = 20000
-    init_model = '/export/home/asanakoy/tmp/tf_test/tennis_serve/checkpoint-{}'. \
-        format(iteration)
+    init_model = '/export/home/asanakoy/workspace01/datasets/OlympicSports/cnn/{}/checkpoint-{}'. \
+        format(category, iteration)
 
     params = {
         'category': category,
