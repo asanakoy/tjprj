@@ -34,6 +34,42 @@ def fill_feed_dict(net, batch_loader, batch_size=128, phase='test'):
     }
     return feed_dict
 
+def fill_feed_dict_magnet(net, mu_ph, sigma_ph, batch_loader, centroider, batch_size=128, phase='test'):
+    """Fills the feed_dict for training the given step.
+
+    A feed_dict takes the form of:
+    feed_dict = {
+        <placeholder>: <tensor of values to be passed for placeholder>,
+        ....
+    }
+
+    Args:
+      batch_loader: BatchLoader, that provides batches of the data
+      images_pl: The images placeholder, from placeholder_inputs().
+      labels_pl: The labels placeholder, from placeholder_inputs().
+
+    Returns:
+      feed_dict: The feed dictionary mapping from placeholders to values.
+    """
+    assert phase in ['train', 'test']
+    keep_prob = 1.0 if phase == 'test' else 0.5
+
+    images_feed, labels_feed = batch_loader.get_next_batch(batch_size)
+    mu_feed = centroider.get_nearest_mu(labels_feed)
+    sigma_feed = centroider.get_sigma(labels_feed)
+    # TODO: remove after I fix BatchLoader. Presently BatchLoader outputs CxHxW images.
+    images_feed = images_feed.transpose((0, 2, 3, 1))
+
+    feed_dict = {
+        net.x: images_feed,
+        net.y_gt: labels_feed,
+        mu_ph: mu_feed,
+        sigma_ph: sigma_feed,
+        net.fc6_keep_prob: keep_prob,
+        net.fc7_keep_prob: keep_prob
+    }
+    return feed_dict
+
 
 def calc_acuracy(net,
                  sess,

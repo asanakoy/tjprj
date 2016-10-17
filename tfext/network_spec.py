@@ -56,6 +56,34 @@ def loss(logits, labels):
     loss_value = tf.reduce_mean(cross_entropy, name='xentropy_mean')
     return loss_value
 
+def loss_magnet(x, mu, sigma, y, alpha=1.0):
+
+
+    # Compute squared distance of each example to each cluster centroid
+    d = tf.squared_difference(mu, tf.expand_dims(x, 1))
+    d = tf.reduce_sum(d, 2)
+
+    # Select distances of examples to their own centroid
+    d_xi_mui = tf.squared_difference(mu, x)
+    d_xi_mui = tf.reduce_sum(d_xi_mui, 1)
+
+    # Compute variance of intra-cluster distances
+    var_normalizer = -1.0 / (2.0 * sigma ** 2.0)
+
+    # Compute numerator
+    numerator = tf.exp(var_normalizer * d_xi_mui - alpha)
+
+    # Compute denominator
+    d_xi_muk = tf.exp(var_normalizer * d)
+    denominator = tf.reduce_sum(d_xi_muk, 1)
+
+    # Compute example losses and total loss
+    epsilon = 1e-8
+    losses = tf.nn.relu(-tf.log(numerator / (denominator + epsilon) + epsilon))
+    total_loss = tf.reduce_mean(losses)
+
+    return total_loss
+
 
 def training(net, loss, base_lr=None, fc_lr_mult=1.0, conv_lr_mult=1.0, **params):
     """Sets up the training Ops.
