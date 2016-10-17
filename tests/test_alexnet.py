@@ -22,7 +22,7 @@ def test_feed_forward(net):
     batch = batch[:, :, :, ::-1]  # MAKE BGR!
 
     t = time.time()
-    output = net.sess.run(net.prob, feed_dict={net.x: batch})
+    output = net.sess.run(net.prob, feed_dict={'input/x:0': batch})
     for input_im_ind in range(output.shape[0]):
         inds = np.argsort(output)[input_im_ind, :]
         print "Image", input_im_ind
@@ -37,7 +37,7 @@ if __name__ == '__main__':
         'init_model': os.path.join(MODELS_DIR, 'bvlc_alexnet.npy'),
         'num_classes': 1000,
         'device_id': '/gpu:0',
-        'num_layers_to_init': 8,
+        'num_layers_to_init': 7,
         'im_shape': (227, 227, 3)
     }
 
