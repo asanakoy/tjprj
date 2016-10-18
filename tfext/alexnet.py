@@ -280,6 +280,27 @@ class Alexnet(object):
         # config.gpu_options.per_process_gpu_memory_fraction = 0.27
         self.sess = tf.Session(config=config)
 
+    def restore_from_snapshot(self, snapshot_path, num_layers):
+        """
+        :param snapshot_path: path to the snapshot file
+        :param num_layers: number layers to restore from the snapshot
+                            (conv1 is the #1, fc8 is the #8)
+
+        WARNING! A call of sess.run(tf.initialize_all_variables()) after restoring from snapshot
+                 will overwrite all variables and set them to initial state.
+                 Call restore_from_snapshot() only after sess.run(tf.initialize_all_variables())!
+        """
+        if num_layers > 8 or num_layers < 0:
+            raise ValueError('You can restore only 0 to 8 layers.')
+        if num_layers == 0:
+            return
+        items = self.trainable_vars.items()
+        items.sort()
+        print 'Restoring {} from the snapshot'.format(
+            [items[i][0] for i in xrange(num_layers * 2)])
+        saver = tf.train.Saver([items[i][1] for i in xrange(num_layers * 2)])
+        saver.restore(self.sess, snapshot_path)
+
     def get_conv_weights(self, layer_index, net_data, kernel_height, kernel_width,
                          num_input_channels, kernels_num):
         layer_names = ['conv{}'.format(i) for i in xrange(1, 6)] + \
