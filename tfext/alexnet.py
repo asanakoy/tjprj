@@ -30,8 +30,13 @@ class Alexnet(object):
     WARNING! You should feed images in HxWxC BGR format!
     """
 
+    class RandomInitType:
+        GAUSSIAN = 0,
+        XAVIER = 1
+
     def __init__(self, init_model=None, num_classes=1000,
-                 im_shape=(227, 227, 3), device_id='/gpu:0', num_layers_to_init=8, **params):
+                 im_shape=(227, 227, 3), device_id='/gpu:0', num_layers_to_init=8,
+                 random_init_type=RandomInitType.GAUSSIAN, **params):
         """
         :param init_model: dict containing network weights,
                            or a string with path to .np file with the dict,
@@ -42,6 +47,7 @@ class Alexnet(object):
         self.num_classes = num_classes
         self.device_id = device_id
         self.num_layers_to_init = num_layers_to_init
+        self.random_init_type = random_init_type
         tr_vars = dict()
 
         if len(self.input_shape) == 2:
@@ -320,10 +326,16 @@ class Alexnet(object):
             b = tf.Variable(net_data[l_name][1], name='bias')
         return w, b
 
-    @staticmethod
-    def random_weight_variable(shape, stddev=0.01):
-        initial = tf.truncated_normal(shape, stddev=stddev)
-        return tf.Variable(initial, name='weight')
+    def random_weight_variable(self, shape, stddev=0.01):
+        if self.random_init_type == Alexnet.RandomInitType.GAUSSIAN:
+            initial = tf.truncated_normal(shape, stddev=stddev)
+            return tf.Variable(initial, name='weight')
+        elif self.random_init_type == Alexnet.RandomInitType.XAVIER:
+            return tf.get_variable("weight", shape=shape,
+                                   initializer=tf.contrib.layers.xavier_initializer(
+                                       uniform=True))
+        else:
+            raise ValueError('Unknown random_init_type')
 
     @staticmethod
     def random_bias_variable(shape, value=0.1):
