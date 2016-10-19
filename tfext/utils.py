@@ -1,6 +1,6 @@
 # Artsiom Sanakoyeu, 2016
 from __future__ import division
-
+import numpy as np
 
 def fill_feed_dict(net, batch_loader, batch_size=128, phase='test'):
     """Fills the feed_dict for training the given step.
@@ -34,7 +34,7 @@ def fill_feed_dict(net, batch_loader, batch_size=128, phase='test'):
     }
     return feed_dict
 
-def fill_feed_dict_magnet(net, mu_ph, sigma_ph, batch_loader, centroider, batch_size=128, phase='test'):
+def fill_feed_dict_magnet(net, mu_ph, unique_mu_ph, sigma_ph, batch_loader, centroider, batch_size=128, phase='test'):
     """Fills the feed_dict for training the given step.
 
     A feed_dict takes the form of:
@@ -56,6 +56,8 @@ def fill_feed_dict_magnet(net, mu_ph, sigma_ph, batch_loader, centroider, batch_
 
     images_feed, labels_feed = batch_loader.get_next_batch(batch_size)
     mu_feed = centroider.get_nearest_mu(labels_feed)
+    _, unique_labels = np.unique(labels_feed, return_index=True)
+    unique_mu_feed = mu_feed[unique_labels]
     sigma_feed = centroider.get_sigma(labels_feed)
     # TODO: remove after I fix BatchLoader. Presently BatchLoader outputs CxHxW images.
     images_feed = images_feed.transpose((0, 2, 3, 1))
@@ -64,6 +66,7 @@ def fill_feed_dict_magnet(net, mu_ph, sigma_ph, batch_loader, centroider, batch_
         net.x: images_feed,
         net.y_gt: labels_feed,
         mu_ph: mu_feed,
+        unique_mu_ph: unique_mu_feed,
         sigma_ph: sigma_feed,
         net.fc6_keep_prob: keep_prob,
         net.fc7_keep_prob: keep_prob

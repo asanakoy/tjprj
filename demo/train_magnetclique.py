@@ -17,6 +17,7 @@ import tfext.alexnet
 import tfext.utils
 import tfext.centroider
 import batch_loader
+import sys
 
 import matplotlib.pyplot as plt
 from collections import OrderedDict
@@ -25,16 +26,19 @@ FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_integer('gpu', '0', 'Gpu id to use')
 
 
-def get_pathes(category, dataset):
+def get_pathes(category, dataset, ft):
     data_path = os.path.join('/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/' + dataset + '/augmented_data/10T/training_data_' + dataset + '_')
     indices_dir = os.path.join('/export/home/mbautist/Desktop/workspace/cnn_similarities/data/mat_files/cliqueCNN/' + category + '_batch_128_10trans_shuffleMB1shuffleALL_0/mat/')
+    # indices_dir = os.path.join(
+    #    '/export/home/mbautist/Desktop/workspace/cnn_similarities/MIL-CliqueCNN/clustering/LSP/iter_1')
     # output_dir = os.pathjoin('/export/home/mbautist/Desktop/workspace/cnn_similarities/ablation_experiments/outputs/snapshots/', category)
-    output_dir = os.path.join(os.path.expanduser('~/tmp/tf_test'))
+    output_dir = os.path.join(os.path.expanduser('~/tmp/tf_test_' + category + '_ftCliqueCNN_' + ft + '/'))
     return data_path, indices_dir, output_dir
 
 
 def get_num_classes(indices_path):
     mat_data = h5py.File(indices_path, 'r')
+    # num_cliques = int(np.array(mat_data['new_labels']).max() + 1)
     num_cliques = int(np.array(mat_data['new_labels']).max() + 1)
     return num_cliques
 
@@ -69,9 +73,11 @@ def run_training(**params):
         net = tfext.alexnet.Alexnet(**params)
         norm_fc7 = tf.nn.l2_normalize(net.fc7, dim=1)
         mu_pl = tf.placeholder(tf.float32, (None, 4096))
+        unique_mu_pl = tf.placeholder(tf.float32, (None, 4096))
         sigma_pl = tf.placeholder(tf.float32, (1,))
-        loss = network_spec.loss_magnet(norm_fc7, mu_pl, sigma_pl, net.y_gt)
+        loss = network_spec.loss_magnet(norm_fc7, mu_pl, unique_mu_pl, sigma_pl, net.y_gt)
         train_op = network_spec.training(net, loss, **params)
+
 
         # Add the Op to compare the logits to the labels during correct_classified_top1.
         # eval_correct_top1 = network_spec.correct_classified_top1(logits, net.y_gt)
@@ -81,6 +87,12 @@ def run_training(**params):
         # Instantiate a SummaryWriter to output summaries and the Graph of the current sesion.
         summary_writer = tf.train.SummaryWriter(params['output_dir'], net.sess.graph)
         net.sess.run(tf.initialize_all_variables())
+
+        if params['ftCliqueCNN']:
+            snapshot_path = '/export/home/asanakoy/workspace01/datasets/OlympicSports/cnn/long_jump/checkpoint-20000'
+            net.restore_from_snapshot(snapshot_path, 7)
+
+
         batch_ldr = batch_loader.BatchLoader(params)
         centroid = tfext.centroider.Centroider(batch_ldr)
         centroid.updateCentroids(net.sess, net.x, net.fc7)
@@ -94,7 +106,7 @@ def run_training(**params):
 
             # Fill a feed dictionary with the actual set of images and labels
             # for this particular training step.
-            feed_dict = tfext.utils.fill_feed_dict_magnet(net, mu_pl, sigma_pl, batch_ldr, centroid,
+            feed_dict = tfext.utils.fill_feed_dict_magnet(net, mu_pl, unique_mu_pl, sigma_pl, batch_ldr, centroid,
                                                    batch_size=params['batch_size'],
                                                    phase='train')
 
@@ -106,13 +118,13 @@ def run_training(**params):
             _, loss_value = net.sess.run([train_op, loss], feed_dict=feed_dict)
             duration = time.time() - start_time
 
-            if step % 1000 == 0 and step != 0:
+            if step % 5000 == 0 and step != 0:
                 centroid.updateCentroids(net.sess, net.x, net.fc7)
             # Write the summaries and print an overview fairly often.
             if step % log_step == 0:
-                data = OrderedDict()
-                data['loss'] = loss_value
-                plotter.plot(step, data)
+                # data = OrderedDict()
+                # data['loss'] = loss_value
+                # plotter.plot(step, data)
                 # Update the events file.
                 summary_str = net.sess.run(summary, feed_dict=feed_dict)
                 summary_writer.add_summary(summary_str, step)
@@ -135,42 +147,47 @@ def run_training(**params):
                                                                         duration, duration_full))
 
 
-def main(_):
+def main(finetune):
     category = 'long_jump'
     dataset = 'OlympicSports'
 
-    data_path, indices_dir, output_dir = get_pathes(category, dataset)
+
+    data_path, indices_dir, output_dir = get_pathes(category, dataset, finetune)
     images_aug_path = os.path.join(data_path + category + '.mat')
-    train_indices_path = os.path.join(indices_dir,
-                                      category + '_batch_128_10trans_shuffleMB1shuffleALL_0_train.mat')
+    train_indices_path = os.path.join(indices_dir, category + '_batch_128_10trans_shuffleMB1shuffleALL_0_train.mat')
     mean_path = os.path.join(indices_dir, 'mean.npy')
     num_cliques = get_num_classes(train_indices_path)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-
     params = {
         'im_shape': (227, 227, 3),
         'batch_size': 128,
-        'base_lr': 0.01,
+        'base_lr': 0.001,
         'fc_lr_mult': 1.0,
-        'conv_lr_mult': 0.1,
-        'num_layers_to_init': 6,
+        'conv_lr_mult': 1.0,
+        'num_layers_to_init': 7,
         'dataset': dataset,
         'category': category,
         'num_classes': num_cliques,
-        'snapshot_iter': 2000,
+        'snapshot_iter': 5000,
         'max_iter': 20000,
+        'ftCliqueCNN': bool(finetune),
+        'random_init_type': tfext.alexnet.Alexnet.RandomInitType.GAUSSIAN,
         'indexing_1_based': 1,
         'images_mat_filepath': images_aug_path,
         'indexfile_path': train_indices_path,
         'mean_filepath': mean_path,
+        'shuffle_every_epoch': False,
         'seed': 1988,
         'output_dir': output_dir,
         'init_model': get_first_model_path(dataset),
         'device_id': '/gpu:{}'.format(FLAGS.gpu)
     }
+
+
     run_training(**params)
 
 
 if __name__ == '__main__':
-    tf.app.run()
+    finetune = sys.argv[1]
+    main(finetune)

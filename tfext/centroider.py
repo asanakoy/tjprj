@@ -89,12 +89,14 @@ class Centroider(object):
 
         image = image.transpose((0, 2, 3, 1))
         features = sess.run(out_ph, feed_dict={in_ph: image})
-        return preprocess.normalize(features)
+        features = preprocess.normalize(features)
+        return features
 
     def get_deviation(self, X, label):
 
-        diff = np.sum(X - self.mu[label], axis=1)
-        return np.mean(diff)
+        diff = X - self.mu[label]
+        norm2 = np.sum(np.abs(diff) ** 2, axis=-1)
+        return np.mean(norm2)
 
     def get_centroid(self, X):
 

@@ -56,11 +56,11 @@ def loss(logits, labels):
     loss_value = tf.reduce_mean(cross_entropy, name='xentropy_mean')
     return loss_value
 
-def loss_magnet(x, mu, sigma, y, alpha=1.0):
+def loss_magnet(x, mu, unique_mu, sigma, y, alpha=1.0):
 
 
     # Compute squared distance of each example to each cluster centroid
-    d = tf.squared_difference(mu, tf.expand_dims(x, 1))
+    d = tf.squared_difference(unique_mu, tf.expand_dims(x, 1))
     d = tf.reduce_sum(d, 2)
 
     # Select distances of examples to their own centroid
