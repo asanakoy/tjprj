@@ -20,6 +20,7 @@ import scipy.stats.mstats as stat
 import scipy.spatial.distance as spdis
 import sklearn
 import scipy.io
+from eval.image_getter import ImageGetterFromMat
 
 FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_integer('gpu', '0', 'Gpu id to use')
@@ -29,42 +30,6 @@ def get_num_classes(indices_path):
     mat_data = h5py.File(indices_path, 'r')
     num_cliques = int(np.array(mat_data['new_labels']).max() + 1)
     return num_cliques
-
-
-class ImageGetterFromMat:
-    def __init__(self, mat_path):
-        dataset = h5py.File(mat_path, 'r')
-        self.images_ref = dataset['images_mat']
-
-    def total_num_images(self):
-        return self.images_ref.shape[0]
-
-    def get_batch(self, indxs, resize_shape=None, mean=None):
-        """
-
-        :param indxs:
-        :param resize_shape:
-        :param mean: must be HxWxC RGB
-        :return:
-        """
-        assert len(resize_shape) == 2, 'resize_shape must be of len 2: (h, w)!'
-        assert mean is None or (len(mean.shape) == 3 and mean.shape[2] == 3)
-        batch = self.images_ref[indxs, :, :, :][...]  # matlab format CxWxH x N
-        batch = batch.transpose((0, 3, 2, 1))  # N x HxWxC matrix
-
-        if resize_shape is not None:
-            resized_batch = np.zeros((batch.shape[0],) + resize_shape + (3,), dtype=np.float32)
-            for i in xrange(batch.shape[0]):
-                image = np.asarray(
-                    Image.fromarray(batch[i, ...]).resize(resize_shape, PIL.Image.ANTIALIAS))
-                resized_batch[i, ...] = image
-            batch = resized_batch
-
-        batch = np.asarray(batch, dtype=np.float32)
-        if mean is not None:
-            batch -= np.tile(mean, (batch.shape[0], 1, 1, 1))
-        batch = batch[:, :, :, (2, 1, 0)]  # reorder channels RGB -> BGR
-        return batch
 
 
 def compute_sim(norm_method='zscores', **params):

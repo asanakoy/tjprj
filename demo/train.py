@@ -30,7 +30,10 @@ def get_pathes(category, dataset):
 
 def get_num_classes(indices_path):
     mat_data = h5py.File(indices_path, 'r')
-    num_cliques = int(np.array(mat_data['new_labels']).max() + 1)
+    if 'labels' in mat_data.keys():
+        num_cliques = int(np.array(mat_data['labels']).max() + 1)
+    else:
+        num_cliques = int(np.array(mat_data['new_labels']).max() + 1)
     return num_cliques
 
 
