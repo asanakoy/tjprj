@@ -28,18 +28,22 @@ tf.app.flags.DEFINE_integer('gpu', '0', 'Gpu id to use')
 
 def get_pathes(category, dataset, ft):
     data_path = os.path.join('/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/' + dataset + '/augmented_data/10T/training_data_' + dataset + '_')
-    indices_dir = os.path.join('/export/home/mbautist/Desktop/workspace/cnn_similarities/data/mat_files/cliqueCNN/' + category + '_batch_128_10trans_shuffleMB1shuffleALL_0/mat/')
-    # indices_dir = os.path.join(
-    #    '/export/home/mbautist/Desktop/workspace/cnn_similarities/MIL-CliqueCNN/clustering/LSP/iter_1')
-    # output_dir = os.pathjoin('/export/home/mbautist/Desktop/workspace/cnn_similarities/ablation_experiments/outputs/snapshots/', category)
+    if category == 'long_jump':
+        indices_dir = os.path.join('/export/home/mbautist/Desktop/workspace/cnn_similarities/data/mat_files/cliqueCNN/' + category + '_batch_128_10trans_shuffleMB1shuffleALL_0/mat/')
+    else:
+        indices_dir = os.path.join(
+            '/export/home/mbautist/Desktop/workspace/cnn_similarities/MIL-CliqueCNN/clustering/LSP/iter_1')
     output_dir = os.path.join(os.path.expanduser('~/tmp/tf_test_' + category + '_ftCliqueCNN_' + ft + '/'))
     return data_path, indices_dir, output_dir
 
 
-def get_num_classes(indices_path):
+def get_num_classes(category, indices_path):
     mat_data = h5py.File(indices_path, 'r')
     # num_cliques = int(np.array(mat_data['new_labels']).max() + 1)
-    num_cliques = int(np.array(mat_data['new_labels']).max() + 1)
+    if category == 'long_jump':
+        num_cliques = int(np.array(mat_data['new_labels']).max() + 1)
+    else:
+        num_cliques = int(np.array(mat_data['labels']).max() + 1)
     return num_cliques
 
 
@@ -98,7 +102,7 @@ def run_training(**params):
         centroid.updateCentroids(net.sess, net.x, net.fc7)
 
 
-        plotter = Plotter(2, 2)
+        # plotter = Plotter(2, 2)
 
         log_step = 1
         for step in xrange(params['max_iter']):
@@ -147,16 +151,23 @@ def run_training(**params):
                                                                         duration, duration_full))
 
 
-def main(finetune):
-    category = 'long_jump'
-    dataset = 'OlympicSports'
+def main(category, finetune):
+    if category == 'long_jump':
+        dataset = 'OlympicSports'
+    else:
+        dataset = 'lsp_dataset_original'
+
 
 
     data_path, indices_dir, output_dir = get_pathes(category, dataset, finetune)
     images_aug_path = os.path.join(data_path + category + '.mat')
-    train_indices_path = os.path.join(indices_dir, category + '_batch_128_10trans_shuffleMB1shuffleALL_0_train.mat')
+    if category == 'long_jump':
+        train_indices_path = os.path.join(indices_dir, category + '_batch_128_10trans_shuffleMB1shuffleALL_0_train.mat')
+    else:
+        train_indices_path = os.path.join(indices_dir + '/train_indices.mat')
+
     mean_path = os.path.join(indices_dir, 'mean.npy')
-    num_cliques = get_num_classes(train_indices_path)
+    num_cliques = get_num_classes(category, train_indices_path)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     params = {
@@ -189,5 +200,6 @@ def main(finetune):
 
 
 if __name__ == '__main__':
-    finetune = sys.argv[1]
-    main(finetune)
+    category = sys.argv[1]
+    finetune = sys.argv[2]
+    main(category, finetune)
