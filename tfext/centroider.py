@@ -33,7 +33,7 @@ class Centroider(object):
     Calculate the closest centroid for each sample.
     """
 
-    def __init__(self, net, batch_ldr):
+    def __init__(self, batch_ldr):
         """
 
         :param batch_loader: BatchLoader
@@ -41,11 +41,11 @@ class Centroider(object):
         :return:
         """
         print "Calculating nearest representatives for each class..."
-        self.net = net
         self.batch_ldr = batch_ldr
         self.mu = np.zeros((np.max(batch_ldr.labels)+1, 4096))
+        self.sigma = np.zeros((np.max(batch_ldr.labels)+1))
 
-    def updateCentroids(self, batch_size=128):
+    def updateCentroids(self, sess, in_ph, out_ph, batch_size=128):
         """
 
         :param batch_size:
@@ -64,8 +64,9 @@ class Centroider(object):
             image = np.empty((unq_idx.shape[0], 3, 227, 227), dtype=np.float32)
             for idx, i in enumerate(unq_idx):
                 image[idx, :, :, :] = self.batch_ldr.images_container.get_image(image_ids[i], flip_values[i])
-            features = self.get_feature(image)
+            features = self.get_feature(image, sess, in_ph, out_ph)
             self.mu[label] = self.get_centroid(features)
+            self.sigma[label] = self.get_deviation(features, label)
 
 
     def get_nearest_mu(self, labels):
@@ -74,7 +75,10 @@ class Centroider(object):
         """
         return self.mu[labels.astype('int32')]
 
-    def get_feature(self, image):
+    def get_sigma(self, labels):
+        return np.expand_dims(np.mean(self.sigma[labels.astype('int32')]), 0)
+
+    def get_feature(self, image, sess, in_ph, out_ph):
         """
         :param image:
         :return: feature representation of that image
@@ -84,10 +88,15 @@ class Centroider(object):
             image = np.expand_dims(image, 0)
 
         image = image.transpose((0, 2, 3, 1))
-        fc7 = self.net.sess.run(self.net.fc7, feed_dict={self.net.x: image})
-        return tf.nn.l2_normalize(fc7, dim=1).eval(session=self.net.sess)
+        features = sess.run(out_ph, feed_dict={in_ph: image})
+        features = preprocess.normalize(features)
+        return features
 
+    def get_deviation(self, X, label):
 
+        diff = X - self.mu[label]
+        norm2 = np.sum(np.abs(diff) ** 2, axis=-1)
+        return np.mean(norm2)
 
     def get_centroid(self, X):
 

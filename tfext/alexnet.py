@@ -276,8 +276,8 @@ class Alexnet(object):
         config = tf.ConfigProto(log_device_placement=False,
                                 allow_soft_placement=True)
         # please do not use the totality of the GPU memory.
-        config.gpu_options.allow_growth = True
-        # config.gpu_options.per_process_gpu_memory_fraction = 0.27
+        # config.gpu_options.allow_growth = True
+        config.gpu_options.per_process_gpu_memory_fraction = 0.60
         self.sess = tf.Session(config=config)
 
     def restore_from_snapshot(self, snapshot_path, num_layers):
@@ -354,7 +354,7 @@ class Alexnet(object):
         elif self.random_init_type == Alexnet.RandomInitType.XAVIER:
             return tf.get_variable("weight", shape=shape,
                                    initializer=tf.contrib.layers.xavier_initializer(
-                                       uniform=True))
+                                       uniform=False))
         else:
             raise ValueError('Unknown random_init_type')
 
