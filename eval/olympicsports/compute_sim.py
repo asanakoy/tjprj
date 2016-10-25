@@ -1,5 +1,4 @@
-# Original work Copyright 2015 The TensorFlow Authors. Licensed under the Apache License v2.0 http://www.apache.org/licenses/LICENSE-2.0
-# Modified work Copyright (c) 2016 Artsiom Sanakoyeu
+# Copyright (c) 2016 Artsiom Sanakoyeu
 
 # pylint: disable=missing-docstring
 import os.path
@@ -17,7 +16,8 @@ def main(argv):
         category = argv[1]
     else:
         category = 'tennis_serve'
-    model_name = 'tf_0.1conv_1fc'
+    suffix = ''
+    model_name = 'tf_0.1conv_1fc' + '_' + suffix
     mat_path = '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/OlympicSports/crops/' + category + '/images_test.mat'
 
     data_dir = join(
@@ -29,8 +29,8 @@ def main(argv):
     num_classes = eval.olympicsports.utils.get_num_classes(train_indices_path)
 
     iteration = 20000
-    init_model = '/export/home/asanakoy/workspace01/datasets/OlympicSports/cnn/{}/checkpoint-{}'. \
-        format(category, iteration)
+    init_model = '/export/home/asanakoy/workspace01/datasets/OlympicSports/cnn/{}{}/checkpoint-{}'. \
+        format(suffix + '/', category, iteration)
 
     params = {
         'category': category,
@@ -42,10 +42,11 @@ def main(argv):
         'im_shape': (227, 227),
         'batch_size': 256,
         'num_classes': num_classes,
+        'use_batch_norm': False,
         'snapshot_path': init_model,
 
         'sim_output_dir': join(
-            '/export/home/asanakoy/workspace01/datasets/OlympicSports/sim/tf', category),
+            '/export/home/asanakoy/workspace01/datasets/OlympicSports/sim/tf/', suffix, category),
         'device_id': '/gpu:{}'.format(int(argv[0]))
     }
     eval.features.compute_sim_and_save(**params)
