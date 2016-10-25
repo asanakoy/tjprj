@@ -1,28 +1,20 @@
-# Original work Copyright 2015 The TensorFlow Authors. Licensed under the Apache License v2.0 http://www.apache.org/licenses/LICENSE-2.0
-# Modified work Copyright (c) 2016 Artsiom Sanakoyeu
+# Copyright (c) 2016 Artsiom Sanakoyeu
 
 # pylint: disable=missing-docstring
 from __future__ import division
-
 import os.path
 from os.path import join
 import time
-import sys
 
 import tensorflow as tf
-import h5py
 import numpy as np
 import tfext.alexnet
 import tfext.utils
-import PIL
-from PIL import Image
 import scipy.stats.mstats as stat
 import scipy.spatial.distance as spdis
 import sklearn
 import scipy.io
-
-FLAGS = tf.app.flags.FLAGS
-tf.app.flags.DEFINE_integer('gpu', '0', 'Gpu id to use')
+from tqdm import tqdm
 
 
 def compute_sim(net=None, norm_method='zscores', **params):
@@ -84,12 +76,13 @@ def extract_features(flipped, net=None, **params):
             tensor = net.__getattribute__(layer_name)
             d[layer_name] = np.zeros((total_num_images, np.prod(tensor.get_shape()[1:])))
 
-        step = 0
-        cnt_images = 0
-        while cnt_images < total_num_images:
-            batch_idxs = range(cnt_images, min(cnt_images + params['batch_size'],
-                                               total_num_images))
+        print 'Running {} iterations with batch_size={}'.\
+            format(np.round(total_num_images / params['batch_size']), params['batch_size'])
+        for step, batch_start in \
+                tqdm(enumerate(range(0, total_num_images, params['batch_size']))):
 
+            batch_idxs = range(batch_start,
+                               min(batch_start + params['batch_size'], total_num_images))
             batch = params['image_getter'].get_batch(batch_idxs,
                                                      resize_shape=params['im_shape'],
                                                      mean=params['mean'])
@@ -100,16 +93,9 @@ def extract_features(flipped, net=None, **params):
                 net.x: batch,
             }
 
-            start_time = time.time()
             features = net.sess.run(tensors_to_get, feed_dict=feed_dict)
             for tensor_id, layer_name in enumerate(params['layer_names']):
-                d[layer_name][batch_idxs, ...] = features[tensor_id].reshape(len(batch_idxs),
-                                                                             -1)
-            duration = time.time() - start_time
-            print 'Batch {} ({} images)({:.3f} s, {:.2f} im/s)'. \
-                format(step + 1, batch.shape[0], duration, params['batch_size'] / duration)
-            cnt_images += len(batch_idxs)
-            step += 1
+                d[layer_name][batch_idxs, ...] = features[tensor_id].reshape(len(batch_idxs), -1)
 
         if is_temp_session:
             net.sess.close()
