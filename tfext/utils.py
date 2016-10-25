@@ -2,6 +2,7 @@
 from __future__ import division
 import numpy as np
 
+
 def fill_feed_dict(net, batch_loader, batch_size=128, phase='test'):
     """Fills the feed_dict for training the given step.
 
@@ -19,8 +20,15 @@ def fill_feed_dict(net, batch_loader, batch_size=128, phase='test'):
     Returns:
       feed_dict: The feed dictionary mapping from placeholders to values.
     """
-    assert phase in ['train', 'test']
-    keep_prob = 1.0 if phase == 'test' else 0.5
+    if phase not in ['train', 'test']:
+        raise ValueError('phase must be "train" or "test"')
+    if phase == 'train':
+        keep_prob = 0.5
+        is_phase_train = True
+    else:
+        keep_prob = 1.0
+        is_phase_train = False
+
 
     images_feed, labels_feed = batch_loader.get_next_batch(batch_size)
     # TODO: remove after I fix BatchLoader. Presently BatchLoader outputs CxHxW images.
@@ -30,9 +38,11 @@ def fill_feed_dict(net, batch_loader, batch_size=128, phase='test'):
         net.x: images_feed,
         net.y_gt: labels_feed,
         net.fc6_keep_prob: keep_prob,
-        net.fc7_keep_prob: keep_prob
+        net.fc7_keep_prob: keep_prob,
+        'input/is_phase_train:0': is_phase_train
     }
     return feed_dict
+
 
 def fill_feed_dict_magnet(net, mu_ph, unique_mu_ph, sigma_ph, batch_loader, centroider, batch_size=128, phase='test'):
     """Fills the feed_dict for training the given step.
@@ -51,8 +61,14 @@ def fill_feed_dict_magnet(net, mu_ph, unique_mu_ph, sigma_ph, batch_loader, cent
     Returns:
       feed_dict: The feed dictionary mapping from placeholders to values.
     """
-    assert phase in ['train', 'test']
-    keep_prob = 1.0 if phase == 'test' else 0.5
+    if phase not in ['train', 'test']:
+        raise ValueError('phase must be "train" or "test"')
+    if phase == 'train':
+        keep_prob = 0.5
+        is_phase_train = True
+    else:
+        keep_prob = 1.0
+        is_phase_train = False
 
     images_feed, labels_feed = batch_loader.get_next_batch(batch_size)
     mu_feed = centroider.get_nearest_mu(labels_feed)
@@ -69,7 +85,8 @@ def fill_feed_dict_magnet(net, mu_ph, unique_mu_ph, sigma_ph, batch_loader, cent
         unique_mu_ph: unique_mu_feed,
         sigma_ph: sigma_feed,
         net.fc6_keep_prob: keep_prob,
-        net.fc7_keep_prob: keep_prob
+        net.fc7_keep_prob: keep_prob,
+        'input/is_phase_train:0': is_phase_train
     }
     return feed_dict
 

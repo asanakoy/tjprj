@@ -7,6 +7,7 @@
 import numpy as np
 import os
 import tensorflow as tf
+import tensorflow.contrib.layers as tflayers
 
 
 class Alexnet(object):
@@ -36,7 +37,7 @@ class Alexnet(object):
 
     def __init__(self, init_model=None, num_classes=1000,
                  im_shape=(227, 227, 3), device_id='/gpu:0', num_layers_to_init=8,
-                 random_init_type=RandomInitType.GAUSSIAN, **params):
+                 random_init_type=RandomInitType.GAUSSIAN, use_batch_norm=False, **params):
         """
         :param init_model: dict containing network weights,
                            or a string with path to .np file with the dict,
@@ -69,6 +70,7 @@ class Alexnet(object):
         with tf.variable_scope('input'):
             self.x = tf.placeholder(tf.float32, (None,) + self.input_shape, name='x')
             self.y_gt = tf.placeholder(tf.int32, shape=(None,), name='y_gt')
+            self.is_phase_train = tf.placeholder(tf.bool, shape=tuple(), name='is_phase_train')
 
         with tf.device(self.device_id):
             layer_index = 0
@@ -236,11 +238,22 @@ class Alexnet(object):
                                ),
                     tr_vars['fc6w']),
                     tr_vars['fc6b'], name='fc')
-                self.fc6_relu = tf.nn.relu(self.fc6, name='relu')
+
+                if use_batch_norm:
+                    print 'Using batch_norm after FC6'
+                    self.fc6_bn = tflayers.batch_norm(self.fc6, decay=0.999,
+                                        is_training=self.is_phase_train,
+                                        trainable=False)
+                    out = self.fc6_bn
+                else:
+                    out = self.fc6
+
+                self.fc6_relu = tf.nn.relu(out, name='relu')
 
                 self.fc6_keep_prob = tf.placeholder_with_default(1.0, tuple(),
                                                                  name='keep_prob_pl')
                 fc6_dropout = tf.nn.dropout(self.fc6_relu, self.fc6_keep_prob, name='dropout')
+
 
             # fc(4096, name='fc7')
             with tf.variable_scope('fc7'):
@@ -251,7 +264,16 @@ class Alexnet(object):
                 layer_index += 1
                 self.fc7 = tf.add(tf.matmul(fc6_dropout, tr_vars['fc7w']), tr_vars['fc7b'],
                                   name='fc')
-                self.fc7_relu = tf.nn.relu(self.fc7, name='relu')
+                if use_batch_norm:
+                    print 'Using batch_norm after FC7'
+                    self.fc7_bn = tflayers.batch_norm(self.fc7, decay=0.999,
+                                                      is_training=self.is_phase_train,
+                                                      trainable=False)
+                    out = self.fc7_bn
+                else:
+                    out = self.fc7
+
+                self.fc7_relu = tf.nn.relu(out, name='relu')
 
                 self.fc7_keep_prob = tf.placeholder_with_default(1.0, tuple(),
                                                                  name='keep_prob_pl')

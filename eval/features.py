@@ -91,6 +91,7 @@ def extract_features(flipped, net=None, **params):
 
             feed_dict = {
                 net.x: batch,
+                'input/is_phase_train:0': False
             }
 
             features = net.sess.run(tensors_to_get, feed_dict=feed_dict)
