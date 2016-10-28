@@ -18,6 +18,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+import numpy as np
 
 def placeholder_inputs(batch_size, image_shape):
     """Generate placeholder variables to represent the input tensors.
@@ -82,7 +83,45 @@ def loss_magnet(x, mu, unique_mu, sigma, y, alpha=1.0):
     losses = tf.nn.relu(-tf.log(numerator / (denominator + epsilon) + epsilon))
     total_loss = tf.reduce_mean(losses)
 
+
     return total_loss
+
+
+
+def loss_generative_discriminative(x, logits, mu, unique_mu, sigma, y, alpha=1.0):
+
+    _lambda = tf.constant(1.0, dtype=tf.float32, shape=[1])
+    # Compute squared distance of each example to each cluster centroid
+    d = tf.squared_difference(unique_mu, tf.expand_dims(x, 1))
+    d = tf.reduce_sum(d, 2)
+
+    # Select distances of examples to their own centroid
+    d_xi_mui = tf.squared_difference(mu, x)
+    d_xi_mui = tf.reduce_sum(d_xi_mui, 1)
+
+    # Compute variance of intra-cluster distances
+    var_normalizer = -1.0 / (2.0 * sigma ** 2.0)
+
+    # Compute numerator
+    numerator = tf.exp(var_normalizer * d_xi_mui - alpha)
+
+    # Compute denominator
+    d_xi_muk = tf.exp(var_normalizer * d)
+    denominator = tf.reduce_sum(d_xi_muk, 1)
+
+    # Compute example losses and total loss
+    epsilon = 1e-8
+    losses = tf.nn.relu(-tf.log(numerator / (denominator + epsilon) + epsilon))
+    generative_loss = tf.reduce_mean(losses)
+
+    # Compute discriminative loss
+    y = tf.to_int64(y)
+    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
+        logits, y, name='xentropy')
+    discriminative_loss = tf.reduce_mean(cross_entropy, name='xentropy_mean')
+
+    return tf.add(generative_loss, discriminative_loss)
+
 
 
 def training(net, loss, base_lr=None, fc_lr_mult=1.0, conv_lr_mult=1.0, **params):
@@ -107,6 +146,7 @@ def training(net, loss, base_lr=None, fc_lr_mult=1.0, conv_lr_mult=1.0, **params
     conv_optimizer = tf.train.AdagradOptimizer(base_lr * conv_lr_mult)
     fc_optimizer = tf.train.AdagradOptimizer(base_lr * fc_lr_mult)
     print('Conv LR: {}, FC LR: {}'.format(base_lr * conv_lr_mult, base_lr * fc_lr_mult))
+
     assert len(net.trainable_vars) == len(tf.trainable_variables())
 
     conv_vars = [val for (key, val) in net.trainable_vars.iteritems() if key.startswith('conv')]

@@ -24,8 +24,6 @@
 import numpy as np
 import scipy.spatial.distance as spdis
 import sklearn.preprocessing as preprocess
-import tensorflow as tf
-
 
 
 class Centroider(object):
@@ -52,14 +50,14 @@ class Centroider(object):
         :return:
         """
 
-        for label in xrange(np.max(self.batch_ldr.labels) + 1):
+        for label in np.unique(self.batch_ldr.labels):
 
             print "Represenative for class {}...".format(label)
+
             idx_class = np.nonzero(self.batch_ldr.labels == label)[0]
             image_ids = np.asarray(self.batch_ldr.indexlist)[idx_class]
             flip_values = np.asarray(self.batch_ldr.flip_values)[idx_class]
             unq_vals, unq_idx = np.asarray(np.unique(image_ids, return_index=True))
-
             features = np.zeros((unq_idx.shape[0], 4096))
             image = np.empty((unq_idx.shape[0], 3, 227, 227), dtype=np.float32)
             for idx, i in enumerate(unq_idx):
