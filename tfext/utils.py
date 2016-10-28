@@ -1,13 +1,6 @@
 # Artsiom Sanakoyeu, 2016
 from __future__ import division
 import numpy as np
-import h5py
-from clustering.batchgenerator import BatchGenerator
-from clustering.batchsampler import BatchSampler
-from clustering.clique import Clique
-import cPickle as pickle
-import os
-
 
 def fill_feed_dict(net, batch_loader, batch_size=128, phase='test'):
     """Fills the feed_dict for training the given step.
@@ -141,81 +134,3 @@ def calc_acuracy(net,
     print('  Num examples: %d  Num correct: %d Accuracy @ 1: %0.04f' %
 
           (num_examples, true_count, accuracy))
-
-
-def get_params_clustering(dataset, category):
-    """
-    Params for clustering
-    :param dataset:
-    :param category:
-    :return:
-    """
-
-    pathtosim = '/net/hciserver03/storage/mbautist/Desktop/workspace/cnn_similarities/compute_similarities/' \
-                'sim_matrices/hog-lda/simMatrix_{}.mat'.format(category)
-    pathtosim_avg = '/net/hciserver03/storage/mbautist/Desktop/workspace/cnn_similarities/datasets/{}/' \
-                    'similarities_lda/d_{}.mat'.format(dataset, category)
-    pathtoimg = '/net/hciserver03/storage/mbautist/Desktop/workspace/cnn_similarities/datasets/{}/image_data/' \
-                'imagePaths_{}.txt'.format(dataset, category)
-    pathtocrops = '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets' \
-                  '/{}/crops/{}'.format(dataset, category)
-    pathtoanchors = '/net/hciserver03/storage/mbautist/Desktop/workspace/cnn_similarities/datasets/{}/labels_HIWIs' \
-                    '/processed_labels/anchors_{}.mat'.format(dataset, category)
-    anchors = h5py.File(pathtoanchors, 'r')
-
-    with open(pathtoimg) as f:
-        imnames = f.readlines()
-    seqnames = [n[2:25] for n in imnames]
-
-    params = {
-        'pathtosim': pathtosim,
-        'pathtosim_avg': pathtosim_avg,
-        'seqNames': seqnames,
-        'imagePath': imnames,
-        'pathToFolder': pathtocrops,
-        'init_nCliques': 10,
-        'nSamples': 8,
-        'anchors': anchors,
-        'sampled_nbatches': 1000,
-        'dataset': dataset,
-        'category': category,
-    }
-
-    return params
-
-
-def runClustering(params_clustering, params):
-    """
-    Run clustering assignment procedure and return arrays for BatchLoader in a dict
-    :param kwargs_generator: arguments for generator
-    :param kwargs_sampler: arguments for sampler
-    :return: Dict of arrays for BatchLoader
-    """
-    if params_clustering['clustering_round'] == 0:
-        generator = BatchGenerator(**params_clustering)
-        init_batches = generator.generateBatches(init_nbatches=100)
-        params_clustering['batches'] = init_batches
-        params_clustering['sampler'] = BatchSampler(**params_clustering)
-        params_clustering['sampler'].updateCliqueSampleProb(np.ones(len(params_clustering['sampler'].cliques)))
-    else:
-        params_clustering['sampler'].updateSimMatrix(params_clustering['simMatrix'])
-        params_clustering['sampler'].transitiveCliqueComputation()
-
-    # # Save batchsampler
-    # sampler_file = open(os.path.join(params['output_dir'], 'sampler_round_' + str(params['clustering_round']) + '.pkl'), 'wb')
-    # pickle.dump(params_clustering['sampler'], sampler_file, pickle.HIGHEST_PROTOCOL)
-    # sampler_file.close()
-
-    indices = np.empty(0, dtype=np.int64)
-    flipped = np.empty(0, dtype=np.bool)
-    label = np.empty(0, dtype=np.int64)
-    for i in range(params_clustering['sampled_nbatches']):
-        print "Sampling batch {}".format(i)
-        batch = params_clustering['sampler'].sampleBatch(batch_size=128, max_cliques_per_batch=8, mode='random')
-        _x, _f, _y = params_clustering['sampler'].parse_to_list(batch)
-        indices = np.append(indices, _x.astype(dtype=np.int64))
-        flipped = np.append(flipped, _f.astype(dtype=np.bool))
-        label = np.append(label, _y.astype(dtype=np.int64))
-
-    assert indices.shape[0] == flipped.shape[0] == label.shape[0], "Corrupted arguments for batch loader"
-    return {'idxs': indices, 'flipvals': flipped, 'labels': label}, params_clustering

@@ -23,7 +23,6 @@ import matplotlib.pyplot as plt
 import gc
 
 
-
 def get_pathes(category, dataset):
     data_path = os.path.join('/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/{}/crops/{}/images.mat'.format(dataset, category))
     indices_dir = os.path.join('/export/home/mbautist/Desktop/workspace/cnn_similarities/data/mat_files/cliqueCNN/' + category + '_batch_128_10trans_shuffleMB1shuffleALL_0/mat/')
@@ -135,7 +134,7 @@ def run_training_current_clustering(**params):
 
 def run_training(**params):
 
-    params_clustering = tfext.utils.get_params_clustering(params['dataset'], params['category'])
+    params_clustering = trainhelper.get_params_clustering(params['dataset'], params['category'])
 
     for clustering_round in range(0, 5):
 
@@ -146,14 +145,16 @@ def run_training(**params):
 
         # Use HOGLDA for initial estimate of similarities
         if clustering_round == 0:
-            matrices = trainhelper.get_step_similarities(0, None, params['category'], None, **params_clustering)
+            matrices = trainhelper.get_step_similarities(0, None, params['category'], None,
+                                                         pathtosim=params_clustering['pathtosim'],
+                                                         pathtosim_avg=params_clustering['pathtosim_avg'])
         else:
-            matrices = trainhelper.get_step_similarities(clustering_round, params['net'], params['category'], ['fc7'], **params_clustering)
+            matrices = trainhelper.get_step_similarities(clustering_round, params['net'], params['category'], ['fc7'])
 
         # Run clustering and update corresponding param fields
         params_clustering.update(matrices)
         params_clustering['clustering_round'] = clustering_round
-        batch_ldr_dict_params, params_clustering = tfext.utils.runClustering(params_clustering, params)
+        batch_ldr_dict_params, params_clustering = trainhelper.runClustering(**params_clustering)
         params['indexfile_path'] = batch_ldr_dict_params
         params['num_classes'] = batch_ldr_dict_params['labels'].max() + 1
         params['batch_ldr'] = batch_loader_with_prefetch.BatchLoader(params)

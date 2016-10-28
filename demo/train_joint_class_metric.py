@@ -145,7 +145,7 @@ def run_training_current_clustering(**params):
 
 def run_training(**params):
 
-    params_clustering = tfext.utils.get_params_clustering(params['dataset'], params['category'])
+    params_clustering = trainhelper.get_params_clustering(params['dataset'], params['category'])
 
     for clustering_round in range(0, 3):
 
@@ -155,13 +155,16 @@ def run_training(**params):
 
         # Use HOGLDA for initial estimate of similarities
         if clustering_round == 0:
-            matrices = trainhelper.get_step_similarities(0, None, params['category'], None, **params_clustering)
+            matrices = trainhelper.get_step_similarities(0, None, params['category'], None,
+                                                         pathtosim=params_clustering['pathtosim'],
+                                                         pathtosim_avg=params_clustering['pathtosim_avg'])
         else:
-            matrices = trainhelper.get_step_similarities(clustering_round, params['net'], params['category'], ['fc7'], **params_clustering)
+            matrices = trainhelper.get_step_similarities(clustering_round, params['net'],
+                                                         params['category'], ['fc7'])
 
         # Run clustering and update corresponding param fields
         params_clustering.update(matrices)
-        batch_ldr_dict_params,  = tfext.utils.runClustering(**params_clustering)
+        batch_ldr_dict_params,  = trainhelper.runClustering(**params_clustering)
         params['indexfile_path'] = batch_ldr_dict_params
         params['num_classes'] = batch_ldr_dict_params['labels'].max() + 1
         params['batch_ldr'] = batch_loader_with_prefetch.BatchLoader(params)
