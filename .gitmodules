@@ -1,0 +1,3 @@
+[submodule "clustering_cvpr"]
+	path = clustering
+	url = git@github.com:miguelbautista/clustering_cvpr.git
