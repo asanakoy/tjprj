@@ -18,6 +18,8 @@ from tqdm import tqdm
 
 
 def compute_sim(net=None, norm_method='zscores', **params):
+
+    params['return_features'] = params.get('return_features', False)
     accepable_methods = [None, 'zscores', 'unit_norm']
     if norm_method not in accepable_methods:
         raise ValueError('unknown norm method: {}. Use one of {}'.format(norm_method,
@@ -42,7 +44,11 @@ def compute_sim(net=None, norm_method='zscores', **params):
     sim_matrix = np.float32(2 - sim_matrix)
     sim_matrix_flip = np.float32(2 - sim_matrix_flip)
     sim = {'simMatrix': sim_matrix, 'simMatrix_flip': sim_matrix_flip}
-    return sim
+
+    if params['return_features']:
+        return sim, d
+    else:
+        return sim
 
 
 def compute_sim_and_save(norm_method='zscores', net=None, **params):
@@ -57,6 +63,10 @@ def compute_sim_and_save(norm_method='zscores', net=None, **params):
 
 
 def extract_features(flipped, net=None, **params):
+
+    # Default param 8 layers
+    params['number_layers_restore'] = params.get('number_layers_restore', 8)
+
     with tf.Graph().as_default():
         if net is None:
             is_temp_session = True
@@ -64,7 +74,7 @@ def extract_features(flipped, net=None, **params):
             saver = tf.train.Saver()
             net.sess.run(tf.initialize_all_variables())
             assert os.path.exists(params['snapshot_path'])
-            saver.restore(net.sess, params['snapshot_path'])
+            net.restore_from_snapshot(params['snapshot_path'], params['number_layers_restore'])
         else:
             is_temp_session = False
 
