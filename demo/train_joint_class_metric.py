@@ -14,13 +14,12 @@ import tensorflow as tf
 import h5py
 import numpy as np
 from tfext import network_spec
-from tfext import centroider
+from tfext import centroider as centroider
 import tfext.alexnet
 import tfext.utils
 import batch_loader_with_prefetch
 import matplotlib.pyplot as plt
 import gc
-
 
 
 def get_pathes(category, dataset):
@@ -72,11 +71,18 @@ def setup_network(**params):
         tf.reset_default_graph()
         del params['net']
         del params['loss']
-        del params['train_op']
 
     net = tfext.alexnet.Alexnet(**params)
+
+    # Loss for metric learning
     logits = net.fc8
-    loss = network_spec.loss(logits, net.y_gt)
+    norm_fc7 = tf.nn.l2_normalize(net.fc7, dim=1)
+    mu_pl = tf.placeholder(tf.float32, (None, 4096))
+    unique_mu_pl = tf.placeholder(tf.float32, (None, 4096))
+    sigma_pl = tf.placeholder(tf.float32, (1,))
+    loss = network_spec.loss_generative_discriminative(norm_fc7, logits, mu_pl, unique_mu_pl, sigma_pl, net.y_gt)
+
+    # Group losses
     train_op = network_spec.training(net, loss, **params)
 
     # Add the Op to compare the logits to the labels during correct_classified_top1.
@@ -91,7 +97,11 @@ def setup_network(**params):
     summary = tf.scalar_summary(['loss', 'batch_accuracy'], [loss, accuracy])
 
     net.sess.run(tf.initialize_all_variables())
-    return {'net': net, 'train_op': train_op, 'loss': loss, 'saver': saver, 'summary_writer': summary_writer, 'summary': summary}
+    return {'net': net, 'train_op': train_op, 'loss': loss, 'saver': saver, 'summary_writer': summary_writer,
+            'summary': summary, 'mu_ph': mu_pl, 'unique_mu_ph': unique_mu_pl, 'sigma_ph': sigma_pl}
+
+
+
 
 
 def run_training_current_clustering(**params):
@@ -105,7 +115,7 @@ def run_training_current_clustering(**params):
 
         # Fill a feed dictionary with the actual set of images and labels
         # for this particular training step.
-        feed_dict = tfext.utils.fill_feed_dict(params['net'], params['batch_ldr'],
+        feed_dict = tfext.utils.fill_feed_dict_magnet(params['net'], params['mu_ph'], params['unique_mu_ph'], params['sigma_ph'], params['batch_ldr'], params['centroider'],
                                                batch_size=params['batch_size'],
                                                phase='train')
 
@@ -136,9 +146,8 @@ def run_training(**params):
 
     params_clustering = tfext.utils.get_params_clustering(params['dataset'], params['category'])
 
-    for clustering_round in range(0, 5):
+    for clustering_round in range(0, 3):
 
-        params['clustering_round'] = 'clustering_round'
         # Delete old batch_ldr, recompute clustering and create new batch_ldr
         del params['batch_ldr']
         gc.collect()
@@ -151,8 +160,7 @@ def run_training(**params):
 
         # Run clustering and update corresponding param fields
         params_clustering.update(matrices)
-        params_clustering['clustering_round'] = clustering_round
-        batch_ldr_dict_params, params_clustering = tfext.utils.runClustering(params_clustering, params)
+        batch_ldr_dict_params,  = tfext.utils.runClustering(**params_clustering)
         params['indexfile_path'] = batch_ldr_dict_params
         params['num_classes'] = batch_ldr_dict_params['labels'].max() + 1
         params['batch_ldr'] = batch_loader_with_prefetch.BatchLoader(params)
@@ -160,6 +168,10 @@ def run_training(**params):
         # Create network with new clustering parameters and return it in network_params dict
         network_params = setup_network(**params)
         params.update(network_params)
+
+        # Update centroids with created network
+        params['centroider'] = centroider.Centroider(params['batch_ldr'])
+        params['centroider'].updateCentroids(params['net'].sess, params['net'].x, params['net'].fc7)
 
         # Restore from previous round model
         if clustering_round > 0:
@@ -180,8 +192,7 @@ def main(argv):
     if len(argv) > 1:
         category = argv[1]
     else:
-        pass
-    category = 'long_jump'
+        category = 'long_jump'
     dataset = 'OlympicSports'
 
     data_path, indices_dir, output_dir = get_pathes(category, dataset)
@@ -201,7 +212,7 @@ def main(argv):
         'category': category,
         'num_classes': None,
         'snapshot_iter': 2000,
-        'max_iter': 10000,
+        'max_iter': 20000,
         'indexing_1_based': 0,
         'images_mat_filepath': data_path,
         'indexfile_path': None,
