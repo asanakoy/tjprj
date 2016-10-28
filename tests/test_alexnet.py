@@ -22,7 +22,7 @@ def test_feed_forward(net):
     batch = batch[:, :, :, ::-1]  # MAKE BGR!
 
     t = time.time()
-    output = net.sess.run(net.prob, feed_dict={'input/x:0': batch})
+    output = net.sess.run(net.prob, feed_dict={'input/x:0': batch, 'input/is_phase_train:0': False})
     for input_im_ind in range(output.shape[0]):
         inds = np.argsort(output)[input_im_ind, :]
         print "Image", input_im_ind
@@ -70,7 +70,8 @@ if __name__ == '__main__':
                                                net.x: batch,
                                                net.y_gt: y,
                                                net.fc6_keep_prob: 1.0,
-                                               net.fc7_keep_prob: 1.0})
+                                               net.fc7_keep_prob: 1.0,
+                                               net.is_phase_train: False})
             print("step %d, training accuracy %f" % (i, train_accuracy))
 
 
@@ -78,7 +79,9 @@ if __name__ == '__main__':
                        feed_dict={net.x: batch,
                                   net.y_gt: y,
                                   net.fc6_keep_prob: 0.5,
-                                  net.fc7_keep_prob: 0.5})
+                                  net.fc7_keep_prob: 0.5,
+                                  net.is_phase_train: True})
+
 
 
     # print("test accuracy %g" % accuracy.eval(feed_dict={
