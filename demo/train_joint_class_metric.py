@@ -120,6 +120,11 @@ def run_training_current_clustering(**params):
                                                batch_size=params['batch_size'],
                                                phase='train')
 
+        if step != 0 and step % 2000 == 0:
+            # Update centroids with created network
+            params['centroider'] = centroider.Centroider(params['batch_ldr'])
+            params['centroider'].updateCentroids(params['net'].sess, params['net'].x, params['net'].fc7)
+
         # Run one step of the model.  The return values are the activations
         # from the `train_op` (which is discarded) and the `loss` Op.  To
         # inspect the values of your Ops or variables, you may include them
@@ -149,6 +154,7 @@ def run_training(**params):
 
     for clustering_round in range(0, 3):
 
+
         # Delete old batch_ldr, recompute clustering and create new batch_ldr
         del params['batch_ldr']
         gc.collect()
@@ -164,7 +170,8 @@ def run_training(**params):
 
         # Run clustering and update corresponding param fields
         params_clustering.update(matrices)
-        batch_ldr_dict_params,  = trainhelper.runClustering(**params_clustering)
+        params_clustering['clustering_round'] = clustering_round
+        batch_ldr_dict_params, params_clustering = trainhelper.runClustering(**params_clustering)
         params['indexfile_path'] = batch_ldr_dict_params
         params['num_classes'] = batch_ldr_dict_params['labels'].max() + 1
         params['batch_ldr'] = batch_loader_with_prefetch.BatchLoader(params)
@@ -177,7 +184,7 @@ def run_training(**params):
         params['centroider'] = centroider.Centroider(params['batch_ldr'])
         params['centroider'].updateCentroids(params['net'].sess, params['net'].x, params['net'].fc7)
 
-        # Restore from previous round model
+        # Restore from previous round model 
         if clustering_round > 0:
             checkpoint_file_round = checkpoint_file + '-' + str(clustering_round)
             params['net'].restore_from_snapshot(checkpoint_file_round, 7)
