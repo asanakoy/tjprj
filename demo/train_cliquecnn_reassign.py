@@ -17,6 +17,7 @@ from tfext import network_spec
 from tfext import centroider
 import tfext.alexnet
 import tfext.utils
+from trainhelper import trainhelper
 import batch_loader_with_prefetch
 import matplotlib.pyplot as plt
 import gc
@@ -145,9 +146,9 @@ def run_training(**params):
 
         # Use HOGLDA for initial estimate of similarities
         if clustering_round == 0:
-            matrices = tfext.utils.get_similarities(0, None, params['category'], None, params_clustering)
+            matrices = trainhelper.get_step_similarities(0, None, params['category'], None, **params_clustering)
         else:
-            matrices = tfext.utils.get_similarities(clustering_round, params['net'], params['category'], ['fc7'], params_clustering)
+            matrices = trainhelper.get_step_similarities(clustering_round, params['net'], params['category'], ['fc7'], **params_clustering)
 
         # Run clustering and update corresponding param fields
         params_clustering.update(matrices)

@@ -83,7 +83,9 @@ if __name__ == '__main__':
                                   net.fc7_keep_prob: 0.5,
                                   net.is_phase_train: True})
 
-
+    from trainhelper.trainhelper import get_sim
+    d = get_sim(net, 'long_jump', ['fc7'])
+    print d.keys()
 
     # print("test accuracy %g" % accuracy.eval(feed_dict={
     #     x: mnist.test.images, y_: mnist.test.labels, keep_prob: 1.0}))

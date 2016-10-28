@@ -1,7 +1,6 @@
 # Artsiom Sanakoyeu, 2016
 from __future__ import division
 import numpy as np
-from eval.olympicsports.utils import get_sim
 import h5py
 from clustering.batchgenerator import BatchGenerator
 from clustering.batchsampler import BatchSampler
@@ -183,33 +182,6 @@ def get_params_clustering(dataset, category):
     }
 
     return params
-
-
-def get_similarities(step, net, category, layers, params):
-    """
-    Read similarities to compute clustering
-    :param step:
-    :param net:
-    :param category:
-    :param layers:
-    :return:
-    """
-
-    # If step=0 read initial similarities otherwise compute similarities from the model
-    if step == 0:
-        data = h5py.File(params['pathtosim'], 'r')
-        data2 = h5py.File(params['pathtosim_avg'], 'r')
-        simMatrix = (data2['d'][()] + data2['d'][()].T) / 2.0
-        flipMatrix = data['flipval'][()]
-        return {'simMatrix': simMatrix, 'flipMatrix': flipMatrix}
-    else:
-
-        d, f = get_sim(net, category, layers)
-        simMatrix_joined = np.dstack((d['simMatrix'], d['simMatrix_flip']))
-        flipMatrix = simMatrix_joined.argmax(axis=2)
-        simMatrix = simMatrix_joined.max(axis=2)
-
-        return {'simMatrix': simMatrix, 'flipMatrix': flipMatrix}
 
 
 def runClustering(params_clustering, params):
