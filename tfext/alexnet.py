@@ -37,11 +37,15 @@ class Alexnet(object):
 
     def __init__(self, init_model=None, num_classes=1000,
                  im_shape=(227, 227, 3), device_id='/gpu:0', num_layers_to_init=8,
-                 random_init_type=RandomInitType.GAUSSIAN, use_batch_norm=False, **params):
+                 random_init_type=RandomInitType.GAUSSIAN, use_batch_norm=False,
+                 gpu_memory_fraction=None, **params):
         """
-        :param init_model: dict containing network weights,
-                           or a string with path to .np file with the dict,
-                           if is None then init using random weights and biases
+         Args:
+          init_model: dict containing network weights, or a string with path to .np file with the dict,
+            if is None then init using random weights and biases
+          num_classes: number of output classes
+          gpu_memory_fraction: Fraction on the max GPU memory to allocate for process needs.
+            Allow auto growth if None (can take up to the totality of the memory).
         :return:
         """
         self.input_shape = im_shape
@@ -298,8 +302,10 @@ class Alexnet(object):
         config = tf.ConfigProto(log_device_placement=False,
                                 allow_soft_placement=True)
         # please do not use the totality of the GPU memory.
-        # config.gpu_options.allow_growth = True
-        config.gpu_options.per_process_gpu_memory_fraction = 0.60
+        if gpu_memory_fraction is None:
+            config.gpu_options.allow_growth = True
+        else:
+            config.gpu_options.per_process_gpu_memory_fraction = gpu_memory_fraction
         self.sess = tf.Session(config=config)
 
     def restore_from_snapshot(self, snapshot_path, num_layers):

@@ -167,6 +167,7 @@ def main(argv):
         'seed': 1988,
         'output_dir': output_dir,
         'init_model': get_first_model_path(dataset),
+        'gpu_memory_fraction': 0.38,
         'device_id': '/gpu:{}'.format(int(argv[0]))
     }
     run_training(**params)

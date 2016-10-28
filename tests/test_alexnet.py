@@ -39,6 +39,7 @@ if __name__ == '__main__':
         'device_id': '/gpu:0',
         'num_layers_to_init': 7,
         'im_shape': (227, 227, 3)
+        'gpu_memory_fraction': 0.5
     }
 
     net = tfext.alexnet.Alexnet(**params)

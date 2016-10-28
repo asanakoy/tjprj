@@ -44,9 +44,9 @@ def main(argv):
         'num_classes': num_classes,
         'use_batch_norm': False,
         'snapshot_path': init_model,
-
         'sim_output_dir': join(
             '/export/home/asanakoy/workspace01/datasets/OlympicSports/sim/tf/', suffix, category),
+        'gpu_memory_fraction': 0.35,
         'device_id': '/gpu:{}'.format(int(argv[0]))
     }
     eval.features.compute_sim_and_save(**params)

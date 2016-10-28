@@ -41,6 +41,7 @@ def main(argv):
         'snapshot_path': init_model,
         'sim_output_dir': join(
             '/export/home/asanakoy/workspace/lsp/sim/tf'),
+        'gpu_memory_fraction': 0.35,
         'device_id': '/gpu:{}'.format(gpu_id)
     }
     eval.features.compute_sim_and_save(**params)
