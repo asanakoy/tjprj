@@ -41,6 +41,7 @@ def get_sim(net, category, layer_names, **args):
         'mean': np.load(mean_path),
         'batch_size': default_params['batch_size'],
         'im_shape': (227, 227),
-        'image_getter': ImageGetterFromMat(default_params['mat_path'])
+        'image_getter': ImageGetterFromMat(default_params['mat_path']),
+        'return_features': True
     }
     return eval.features.compute_sim(net=net, **sim_params)
