@@ -17,9 +17,15 @@ import scipy.io
 from tqdm import tqdm
 
 
-def compute_sim(net=None, norm_method='zscores', **params):
-
-    params['return_features'] = params.get('return_features', False)
+def compute_sim(net=None, norm_method='zscores', return_features=False, **params):
+    """
+    Args:
+        net: If specified use this network for feature extraction
+        norm_method: features normalization method. Do not normalize if None.
+                     Must be one of [None, 'zscores', unit_norm]
+        return_features: return tuple (sim, features) if true. Otherwise return sim.
+        params: other parameters
+    """
     accepable_methods = [None, 'zscores', 'unit_norm']
     if norm_method not in accepable_methods:
         raise ValueError('unknown norm method: {}. Use one of {}'.format(norm_method,
@@ -45,7 +51,7 @@ def compute_sim(net=None, norm_method='zscores', **params):
     sim_matrix_flip = np.float32(2 - sim_matrix_flip)
     sim = {'simMatrix': sim_matrix, 'simMatrix_flip': sim_matrix_flip}
 
-    if params['return_features']:
+    if return_features:
         return sim, d
     else:
         return sim

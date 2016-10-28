@@ -14,20 +14,22 @@ import os
 def get_sim(net, category, layer_names, **args):
     """
     Calculate simMatrix and simMatrix_flip from existing net for specified
-        OlympicSports category.
+      OlympicSports category.
     Args can contain:
-        mat_path,
-        data_dir
-        batch_size
+      mat_path,
+      data_dir,
+      batch_size,
+      return_features
     Return: dict = {'simMatrix': sim_matrix, 'simMatrix_flip': sim_matrix_flip}
 
-    Example: d = get_sim(net, 'long_jump', ['fc7'])
+    Example: d = get_sim(net, 'long_jump', ['fc7'], batch_size=128, return_features=False)
     """
     default_params = dict(
         mat_path='/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/OlympicSports/crops/' + category + '/images_test.mat',
         data_dir=join(
             '/export/home/mbautist/Desktop/workspace/cnn_similarities/data/mat_files/cliqueCNN/' + category + '_batch_128_10trans_shuffleMB1shuffleALL_0/mat/'),
-        batch_size=256
+        batch_size=256,
+        return_features=False
     )
     for key in args.keys():
         if key not in default_params:
@@ -42,7 +44,7 @@ def get_sim(net, category, layer_names, **args):
         'batch_size': default_params['batch_size'],
         'im_shape': (227, 227),
         'image_getter': ImageGetterFromMat(default_params['mat_path']),
-        'return_features': True
+        'return_features': default_params['return_features']
     }
     return eval.features.compute_sim(net=net, **sim_params)
 
@@ -65,7 +67,7 @@ def get_step_similarities(step, net, category, layers, pathtosim=None, pathtosim
         flipMatrix = data['flipval'][()]
         return {'simMatrix': simMatrix, 'flipMatrix': flipMatrix}
     else:
-        d, f = get_sim(net, category, layers)
+        d = get_sim(net, category, layers, return_features=False)
         simMatrix_joined = np.dstack((d['simMatrix'], d['simMatrix_flip']))
         flipMatrix = simMatrix_joined.argmax(axis=2)
         simMatrix = simMatrix_joined.max(axis=2)
