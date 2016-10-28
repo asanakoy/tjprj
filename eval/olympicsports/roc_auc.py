@@ -84,6 +84,7 @@ def compute_roc(d, sim):
 
     # Average results: interpolation over all anchors
     grid_x = np.linspace(0, 1, num=101, endpoint=True)
+    assert len(grid_x) == 101
     # grid_x = np.unique(np.hstack(false_pos_rate_list))
     grid_y = np.zeros((len(d['anchors']), len(grid_x)))
     for i in xrange(len(d['anchors'])):
@@ -96,7 +97,7 @@ def compute_roc(d, sim):
     return avg_roc_auc, interp_roc_auc, roc_auc_list
 
 
-def main(argv):
+def main(argv, path_sim_matrix=None):
     if len(argv) == 0:
         category = 'long_jump'
     else:
@@ -105,10 +106,12 @@ def main(argv):
     iter_id = 20000
     dataset_root = '/export/home/asanakoy/workspace01/datasets/OlympicSports/'
 
-    suffix = ''
-    path_sim_matrix = join(dataset_root, 'sim/tf/', suffix, category,
-                           'simMatrix_{}_tf_0.1conv_1fc_{}iter_{}_fc7_zscores.mat'.format(
-                               category, suffix + '_' if len(suffix) else '', iter_id))
+
+    if path_sim_matrix is None:
+        suffix = 'with_bn_fc7'
+        path_sim_matrix = join(dataset_root, 'sim/tf/', suffix, category,
+                               'simMatrix_{}_tf_0.1conv_1fc_{}iter_{}_fc7_zscores.mat'.format(
+                                   category, suffix + '_' if len(suffix) else '', iter_id))
     labels_path = join(dataset_root,
                        'dataset_labeling/labels_hdf5_19.02.16/labels_{}.hdf5'.format(
                            category))
@@ -160,5 +163,6 @@ def run_all_cat():
 
 
 if __name__ == '__main__':
-    run_all_cat()
-    # main(sys.argv[1:])
+    # run_all_cat()
+    # main(['long_jump'], path_sim_matrix='/export/home/mbautist/Desktop/long_jump/simMatrix_long_jump_tf_0.1conv_1fc_growingiter2_iter_20000_fc7_zscores.mat')
+    main(['long_jump'])
