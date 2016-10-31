@@ -65,6 +65,8 @@ def compute_sim_and_save(sim_output_path, norm_method, net=None, **params):
 
 
 def extract_features(flipped, net=None, **params):
+    if not isinstance(params['layer_names'], list):
+        raise TypeError('layer_names must be a list')
 
     # Default param 8 layers
     params['number_layers_restore'] = params.get('number_layers_restore', 8)
