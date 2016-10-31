@@ -35,7 +35,7 @@ class Alexnet(object):
         GAUSSIAN = 0,
         XAVIER = 1
 
-    def __init__(self, init_model=None, num_classes=1000,
+    def __init__(self, init_model=None, num_classes=1,
                  im_shape=(227, 227, 3), device_id='/gpu:0', num_layers_to_init=8,
                  random_init_type=RandomInitType.GAUSSIAN, use_batch_norm=False,
                  gpu_memory_fraction=None, **params):
