@@ -26,7 +26,7 @@ import gc
 def get_pathes(category, dataset):
     data_path = os.path.join('/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/{}/crops/{}/images.mat'.format(dataset, category))
     indices_dir = os.path.join('/export/home/mbautist/Desktop/workspace/cnn_similarities/data/mat_files/cliqueCNN/' + category + '_batch_128_10trans_shuffleMB1shuffleALL_0/mat/')
-    output_dir = os.path.join(os.path.expanduser('~/tmp/tf_test'))
+    output_dir = os.path.join(os.path.expanduser('~/tmp/tf_test/{}/').format(category))
     return data_path, indices_dir, output_dir
 
 
@@ -110,6 +110,7 @@ def run_training_current_clustering(**params):
     # plotter = Plotter(2, 2)
     log_step = 1
     summary_step = 200
+    print("Starting training...")
     for step in xrange(params['max_iter']):
 
         start_time = time.time()
@@ -120,7 +121,7 @@ def run_training_current_clustering(**params):
                                                batch_size=params['batch_size'],
                                                phase='train')
 
-        if step != 0 and step % 2000 == 0:
+        if step != 0 and step % 10000 == 0:
             # Update centroids with created network
             params['centroider'] = centroider.Centroider(params['batch_ldr'])
             params['centroider'].updateCentroids(params['net'].sess, params['net'].x, params['net'].fc7)
@@ -152,7 +153,7 @@ def run_training(**params):
 
     params_clustering = trainhelper.get_params_clustering(params['dataset'], params['category'])
 
-    for clustering_round in range(0, 3):
+    for clustering_round in range(0, 4):
 
 
         # Delete old batch_ldr, recompute clustering and create new batch_ldr
@@ -171,10 +172,11 @@ def run_training(**params):
         # Run clustering and update corresponding param fields
         params_clustering.update(matrices)
         params_clustering['clustering_round'] = clustering_round
+        params_clustering['output_dir'] = params['output_dir']
         batch_ldr_dict_params, params_clustering = trainhelper.runClustering(**params_clustering)
         params['indexfile_path'] = batch_ldr_dict_params
         params['num_classes'] = batch_ldr_dict_params['labels'].max() + 1
-        params['batch_ldr'] = batch_loader_with_prefetch.BatchLoader(params)
+        params['batch_ldr'] = batch_loader_with_prefetch.BatchLoaderWithPrefetch(params)
 
         # Create network with new clustering parameters and return it in network_params dict
         network_params = setup_network(**params)
@@ -218,12 +220,12 @@ def main(argv):
         'base_lr': 0.001,
         'fc_lr_mult': 1.0,
         'conv_lr_mult': 0.1,
-        'num_layers_to_init': 6,
+        'num_layers_to_init': 7,
         'dataset': dataset,
         'category': category,
         'num_classes': None,
         'snapshot_iter': 2000,
-        'max_iter': 20000,
+        'max_iter': 10,
         'indexing_1_based': 0,
         'images_mat_filepath': data_path,
         'indexfile_path': None,
@@ -232,13 +234,14 @@ def main(argv):
         'output_dir': output_dir,
         'init_model': get_first_model_path(dataset),
         'device_id': '/gpu:{}'.format(int(argv[0])),
+        'gpu_memory_fraction': 0.4,
         'shuffle_every_epoch': False,
         'online_augmentations': True,
         'async_preload': True,
         'num_data_workers': 5,
         'batch_ldr': None,
         'augmenter_params': dict(hflip=True, vflip=False,
-                                 scale_to_percent=(0.7, 1.3),
+                                 scale_to_percent=(0.9, 1.1),
                                  scale_axis_equally=True,
                                  rotation_deg=10, shear_deg=7,
                                  translation_x_px=30, translation_y_px=30)
