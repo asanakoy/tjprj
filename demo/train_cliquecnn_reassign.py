@@ -9,18 +9,18 @@ from __future__ import print_function
 import os.path
 import time
 import sys
-
 import tensorflow as tf
 import h5py
 import numpy as np
+import gc
 import pprint
+import matplotlib.pyplot as plt
 from tfext import network_spec
 import tfext.alexnet
 import tfext.utils
 from trainhelper import trainhelper
 import batch_loader_with_prefetch
-import matplotlib.pyplot as plt
-import gc
+import eval.olympicsports.roc.roc_from_net
 
 
 def get_pathes(category, dataset, is_bbox_sq):
@@ -106,9 +106,6 @@ def run_training_current_clustering(**params):
     for step in xrange(params['max_iter']):
 
         start_time = time.time()
-
-        # Fill a feed dictionary with the actual set of images and labels
-        # for this particular training step.
         feed_dict = tfext.utils.fill_feed_dict(params['net'], params['batch_ldr'],
                                                batch_size=params['batch_size'],
                                                phase='train')
@@ -122,11 +119,23 @@ def run_training_current_clustering(**params):
             summary_str, _, loss_value = params['net'].sess.run([params['summary'], params['train_op'], params['loss']],
                                                       feed_dict=feed_dict)
             params['summary_writer'].add_summary(summary_str, step)
-            # summary_writer.flush()
         else:
             _, loss_value = params['net'].sess.run([params['train_op'], params['loss']], feed_dict=feed_dict)
-        duration = time.time() - start_time
 
+        if step % params['test_step'] == 0:
+            roc_auc = eval.olympicsports.roc. \
+                roc_from_net.compute_roc_auc_from_net(params['net'],
+                                                      params['category'],
+                                                      ['fc7'],
+                                                      mat_path=None,
+                                                      mean_path=None,
+                                                      batch_size=256,
+                                                      norm_method='zscores')
+            params['summary_writer'].add_summary(tfext.utils.create_sumamry('ROCAUC', roc_auc), step)
+            params['summary_writer'].flush()
+            print('Step %d: ROCAUC = %.2f' % (step, roc_auc))
+
+        duration = time.time() - start_time
         if step % log_step == 0 or step + 1 == params['max_iter']:
             print('Step %d: loss = %.2f (%.3f s, %.2f im/s)'
                   % (step, loss_value, duration,
@@ -206,8 +215,8 @@ def main(argv):
         'dataset': dataset,
         'category': category,
         'num_classes': None,
-        'snapshot_iter': 2000,
         'max_iter': 10000,
+        'test_step': 10000,
         'indexing_1_based': 0,
         'images_mat_filepath': data_path,
         'indexfile_path': None,
