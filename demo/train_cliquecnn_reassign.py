@@ -13,8 +13,8 @@ import sys
 import tensorflow as tf
 import h5py
 import numpy as np
+import pprint
 from tfext import network_spec
-from tfext import centroider
 import tfext.alexnet
 import tfext.utils
 from trainhelper import trainhelper
@@ -23,11 +23,15 @@ import matplotlib.pyplot as plt
 import gc
 
 
-def get_pathes(category, dataset):
-    data_path = os.path.join('/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/{}/crops/{}/images.mat'.format(dataset, category))
-    indices_dir = os.path.join('/export/home/mbautist/Desktop/workspace/cnn_similarities/data/mat_files/cliqueCNN/' + category + '_batch_128_10trans_shuffleMB1shuffleALL_0/mat/')
+def get_pathes(category, dataset, is_bbox_sq):
+    if is_bbox_sq:
+        data_path = '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/{}/crops/{}/images_227x227_bbox_sq.mat'.format(dataset, category)
+    else:
+        data_path = '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/{}/crops/{}/images.mat'.format(dataset, category)
+
+    mean_path = os.path.join('/export/home/mbautist/Desktop/workspace/cnn_similarities/data/mat_files/cliqueCNN/' + category + '_batch_128_10trans_shuffleMB1shuffleALL_0/mat/mean.npy')
     output_dir = os.path.join(os.path.expanduser('~/tmp/tf_test'))
-    return data_path, indices_dir, output_dir
+    return data_path, mean_path, output_dir
 
 
 def get_num_classes(indices_path):
@@ -123,12 +127,10 @@ def run_training_current_clustering(**params):
             _, loss_value = params['net'].sess.run([params['train_op'], params['loss']], feed_dict=feed_dict)
         duration = time.time() - start_time
 
-
-        duration_full = time.time() - start_time
         if step % log_step == 0 or step + 1 == params['max_iter']:
-            print('Step %d: loss = %.2f (%.3f s, %.2f im/s) (full: %.3f s)'
+            print('Step %d: loss = %.2f (%.3f s, %.2f im/s)'
                   % (step, loss_value, duration,
-                     params['batch_size'] / duration, duration_full))
+                     params['batch_size'] / duration))
     return params
 
 
@@ -140,8 +142,9 @@ def run_training(**params):
 
         params['clustering_round'] = 'clustering_round'
         # Delete old batch_ldr, recompute clustering and create new batch_ldr
-        del params['batch_ldr']
-        gc.collect()
+        if 'batch_ldr' in params:
+            params['batch_ldr']
+            gc.collect()
 
         # Use HOGLDA for initial estimate of similarities
         if clustering_round == 0:
@@ -157,7 +160,7 @@ def run_training(**params):
         batch_ldr_dict_params, params_clustering = trainhelper.runClustering(**params_clustering)
         params['indexfile_path'] = batch_ldr_dict_params
         params['num_classes'] = batch_ldr_dict_params['labels'].max() + 1
-        params['batch_ldr'] = batch_loader_with_prefetch.BatchLoader(params)
+        params['batch_ldr'] = batch_loader_with_prefetch.BatchLoaderWithPrefetch(params)
 
         # Create network with new clustering parameters and return it in network_params dict
         network_params = setup_network(**params)
@@ -182,12 +185,13 @@ def main(argv):
     if len(argv) > 1:
         category = argv[1]
     else:
-        pass
-    category = 'long_jump'
+        category = 'long_jump'
     dataset = 'OlympicSports'
 
-    data_path, indices_dir, output_dir = get_pathes(category, dataset)
-    mean_path = os.path.join(indices_dir, 'mean.npy')
+    # should we use crops that were cropped using the biggest square bounding box around the person
+    is_bbox_sq = 1
+
+    data_path, mean_path, output_dir = get_pathes(category, dataset, is_bbox_sq)
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -216,13 +220,15 @@ def main(argv):
         'online_augmentations': True,
         'async_preload': True,
         'num_data_workers': 5,
-        'batch_ldr': None,
+        'gpu_memory_fraction': 0.4,
         'augmenter_params': dict(hflip=True, vflip=False,
                                  scale_to_percent=(0.7, 1.3),
                                  scale_axis_equally=True,
                                  rotation_deg=10, shear_deg=7,
                                  translation_x_px=30, translation_y_px=30)
     }
+    with open(os.path.join(output_dir, 'train_params.dump.txt'), 'w') as f:
+        f.write('{}\n'.format(pprint.pformat(params)))
     run_training(**params)
 
 
