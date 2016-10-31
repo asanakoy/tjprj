@@ -8,6 +8,13 @@ from eval.image_getter import ImageGetterFromPaths
 import eval.features
 
 
+def get_sim_output_path(model_name, iteration, params):
+    return join('/export/home/asanakoy/workspace/lsp/sim/tf',
+                params['category'], 'simMatrix_{}_{}_iter_{}_{}_{}.mat'.
+                format(params['category'], model_name, iteration,
+                       ''.join(params['layer_names']), params['norm_method']))
+
+
 def main(argv):
     if len(argv) == 0:
         gpu_id = 0
@@ -17,11 +24,8 @@ def main(argv):
     crops_dir = '/export/home/asanakoy/workspace/lsp/crops_227x227'
     image_paths = [join(crops_dir, p) for p in glob.glob1(crops_dir, '*.png')]
 
-    indices_dir = '/export/home/mbautist/Desktop/workspace/cnn_similarities/MIL-CliqueCNN/clustering/LSP/iter_1/'
-    train_indices_path = join(indices_dir, 'train_indices.mat')
-    mean_path = join(indices_dir, 'mean.npy')
+    mean_path = '/export/home/mbautist/Desktop/workspace/cnn_similarities/MIL-CliqueCNN/clustering/LSP/iter_1/mean.npy'
     mean = np.load(mean_path)
-    num_classes = get_num_classes(train_indices_path)
 
     iteration = 30000
     init_model = '/export/home/asanakoy/workspace/lsp/cnn/checkpoint-{}'.format(iteration)
@@ -31,20 +35,20 @@ def main(argv):
     params = {
         'model_name': model_name,
         'category': '',
-        'iter': iteration,
+        'number_layers_restore': 7,
         'layer_names': ['fc6'],
         'image_getter': ImageGetterFromPaths(image_paths, im_shape),
         'mean': None, #mean,
         'im_shape': im_shape,
         'batch_size': 256,
-        'num_classes': num_classes,
         'snapshot_path': init_model,
         'sim_output_dir': join(
-            '/export/home/asanakoy/workspace/lsp/sim/tf'),
+            ''),
         'gpu_memory_fraction': 0.35,
         'device_id': '/gpu:{}'.format(gpu_id)
     }
-    eval.features.compute_sim_and_save(**params)
+    sim_output_path = get_sim_output_path(model_name, iteration, params)
+    eval.features.compute_sim_and_save(sim_output_path, **params)
 
 
 if __name__ == '__main__':

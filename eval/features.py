@@ -57,15 +57,11 @@ def compute_sim(net=None, norm_method='zscores', return_features=False, **params
         return sim
 
 
-def compute_sim_and_save(norm_method='zscores', net=None, **params):
+def compute_sim_and_save(sim_output_path, norm_method, net=None, **params):
     sim = compute_sim(norm_method=norm_method, net=net, **params)
-    path_sim = join(params['sim_output_dir'], 'simMatrix_{}_{}_iter_{}_{}_{}.mat'.
-                    format(params['category'], params['model_name'],
-                           params['iter'], ''.join(params['layer_names']), norm_method))
-    if not os.path.exists(params['sim_output_dir']):
-        os.makedirs(params['sim_output_dir'])
-
-    scipy.io.savemat(path_sim, sim)
+    if not os.path.exists(os.path.dirname(sim_output_path)):
+        os.makedirs(os.path.dirname(sim_output_path))
+    scipy.io.savemat(sim_output_path, sim)
 
 
 def extract_features(flipped, net=None, **params):
@@ -76,8 +72,9 @@ def extract_features(flipped, net=None, **params):
     with tf.Graph().as_default():
         if net is None:
             is_temp_session = True
+            if params['number_layers_restore'] == 8 and 'num_classes' not in params:
+                raise ValueError('You must specify "num_classes" if you restore 8 layers')
             net = tfext.alexnet.Alexnet(init_model=None, **params)
-            saver = tf.train.Saver()
             net.sess.run(tf.initialize_all_variables())
             assert os.path.exists(params['snapshot_path'])
             net.restore_from_snapshot(params['snapshot_path'], params['number_layers_restore'])
