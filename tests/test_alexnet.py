@@ -37,8 +37,9 @@ if __name__ == '__main__':
         'init_model': os.path.join(MODELS_DIR, 'bvlc_alexnet.npy'),
         'num_classes': 1000,
         'device_id': '/gpu:0',
-        'num_layers_to_init': 7,
-        'im_shape': (227, 227, 3)
+        'num_layers_to_init': 6,
+        'im_shape': (227, 227, 3),
+        'use_batch_norm': False,
         'gpu_memory_fraction': 0.5
     }
 
@@ -75,7 +76,6 @@ if __name__ == '__main__':
                                                net.is_phase_train: False})
             print("step %d, training accuracy %f" % (i, train_accuracy))
 
-
         train_step.run(session=net.sess,
                        feed_dict={net.x: batch,
                                   net.y_gt: y,
@@ -84,7 +84,7 @@ if __name__ == '__main__':
                                   net.is_phase_train: True})
 
     from trainhelper.trainhelper import get_sim
-    d = get_sim(net, 'long_jump', ['fc7'])
+    d = get_sim(net, 'long_jump', ['fc7'], return_features=False)
     print d.keys()
 
     # print("test accuracy %g" % accuracy.eval(feed_dict={
