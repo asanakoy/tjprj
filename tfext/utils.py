@@ -1,6 +1,8 @@
 # Artsiom Sanakoyeu, 2016
 from __future__ import division
 import numpy as np
+from tensorflow.core.framework import summary_pb2
+
 
 def fill_feed_dict(net, batch_loader, batch_size=128, phase='test'):
     """Fills the feed_dict for training the given step.
@@ -134,3 +136,11 @@ def calc_acuracy(net,
     print('  Num examples: %d  Num correct: %d Accuracy @ 1: %0.04f' %
 
           (num_examples, true_count, accuracy))
+
+
+def create_sumamry(tag, value):
+    """
+    Create a summary for logging via tf.train.SummaryWriter
+    """
+    x = summary_pb2.Summary.Value(tag=tag, simple_value=value)
+    return summary_pb2.Summary(value=[x])

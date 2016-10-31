@@ -2,17 +2,10 @@ import sys
 from os.path import join
 import numpy as np
 import h5py
-import hdf5storage
-from pprint import pprint
-import seaborn as sbs
-
-from scipy.spatial import distance
-
 import scipy.interpolate
 import scipy.io
-from sklearn.preprocessing import normalize
 import sklearn.metrics as sklm
-import matplotlib.pyplot as plt
+
 
 POS_LABEL = 1
 
@@ -64,6 +57,34 @@ def get_roc_auc(labels, scores, pos_class=1):
     return roc_auc, fpr, tpr
 
 
+def compute_interpolated_roc_auc(labels_dict, false_pos_rate_list, true_pos_rate_list):
+    """
+    Average results: interpolation for all anchors at 101 grid points.
+    Then get joined ROC Curve by averaging interpolated values at grid points.
+    Args:
+        labels_dict: dict of labels
+        false_pos_rate_list: i-th element is the list of false positive rates for the i-th anchor
+        true_pos_rate_list: i-th element is the list of true positive rates for the i-th anchor
+
+    Return: joined ROC AUC
+    """
+    if len(false_pos_rate_list) != len(true_pos_rate_list):
+        raise ValueError('fpr and tpr lists must be of the same size')
+
+    grid_x = np.linspace(0, 1, num=101, endpoint=True)
+    assert len(grid_x) == 101
+    # grid_x = np.unique(np.hstack(false_pos_rate_list))
+    grid_y = np.zeros((len(labels_dict['anchors']), len(grid_x)))
+    for i in xrange(len(labels_dict['anchors'])):
+        func = scipy.interpolate.interp1d(false_pos_rate_list[i],
+                                          true_pos_rate_list[i],
+                                          kind='linear', bounds_error=True)
+        grid_y[i][...] = func(grid_x)
+    mean_y = np.mean(grid_y, axis=0)
+    interp_roc_auc = sklm.auc(grid_x, mean_y, reorder=True)
+    return interp_roc_auc
+
+
 def compute_roc(d, sim):
     stacked_sim_matrix = np.stack([sim['simMatrix'], sim['simMatrix_flip']], axis=2)
     assert stacked_sim_matrix.ndim == 3 and stacked_sim_matrix.shape[2] == 2
@@ -81,23 +102,11 @@ def compute_roc(d, sim):
         false_pos_rate_list.append(fpr)
         true_pos_rate_list.append(tpr)
     avg_roc_auc = np.mean(roc_auc_list)
-
-    # Average results: interpolation over all anchors
-    grid_x = np.linspace(0, 1, num=101, endpoint=True)
-    assert len(grid_x) == 101
-    # grid_x = np.unique(np.hstack(false_pos_rate_list))
-    grid_y = np.zeros((len(d['anchors']), len(grid_x)))
-    for i in xrange(len(d['anchors'])):
-        func = scipy.interpolate.interp1d(false_pos_rate_list[i],
-                                          true_pos_rate_list[i],
-                                          kind='linear', bounds_error=True)
-        grid_y[i][...] = func(grid_x)
-    mean_y = np.mean(grid_y, axis=0)
-    interp_roc_auc = sklm.auc(grid_x, mean_y, reorder=True)
+    interp_roc_auc = compute_interpolated_roc_auc(d, false_pos_rate_list, true_pos_rate_list)
     return avg_roc_auc, interp_roc_auc, roc_auc_list
 
 
-def main(argv, path_sim_matrix=None):
+def compute_roc_auc_from_sim(argv, path_sim_matrix=None):
     if len(argv) == 0:
         category = 'long_jump'
     else:
@@ -106,34 +115,22 @@ def main(argv, path_sim_matrix=None):
     iter_id = 20000
     dataset_root = '/export/home/asanakoy/workspace01/datasets/OlympicSports/'
 
-
     if path_sim_matrix is None:
         suffix = 'with_bn_fc7'
         path_sim_matrix = join(dataset_root, 'sim/tf/', suffix, category,
                                'simMatrix_{}_tf_0.1conv_1fc_{}iter_{}_fc7_zscores.mat'.format(
                                    category, suffix + '_' if len(suffix) else '', iter_id))
+    sim = scipy.io.loadmat(path_sim_matrix)
+
     labels_path = join(dataset_root,
                        'dataset_labeling/labels_hdf5_19.02.16/labels_{}.hdf5'.format(
                            category))
-
-    # TODO: submit bug report on hdf5storage.
-    #  hdf5storage.loadmat(path_sim_matrix) crashes with the matrix
-    #  previously saved with scipy.io.savemat()
-    sim = scipy.io.loadmat(path_sim_matrix)
-
     with h5py.File(labels_path, mode='r') as f:
         d = covert_labels_to_dict(f)
 
     avg_roc_auc, interp_roc_auc, roc_auc_list = compute_roc(d, sim)
     print '{} n_acnhors: {} mean_ROC_AUC: {:.3f} interp_ROC_AUC: {:.3f}'.format(category, len(
         d['anchors']), avg_roc_auc, interp_roc_auc)
-
-    # plt.figure()
-    # plt.title('Per achor ROC AUCs {} {}. mAUC={:.3f}, interpAUC={:.3f} '.format(category, suffix,
-    #                                                                           avg_roc_auc,
-    #                                                                           interp_roc_auc))
-    # sbs.distplot(roc_auc_list, kde=False, norm_hist=False, rug=True)
-    # plt.show()
 
 
 def run_all_cat():
@@ -157,12 +154,13 @@ def run_all_cat():
     categories = sorted(categories)
     for cat in categories:
         try:
-            main([cat])
+            compute_roc_auc_from_sim([cat])
         except IOError as e:
             print e
 
 
 if __name__ == '__main__':
     # run_all_cat()
-    # main(['long_jump'], path_sim_matrix='/export/home/mbautist/Desktop/long_jump/simMatrix_long_jump_tf_0.1conv_1fc_growingiter2_iter_20000_fc7_zscores.mat')
-    main(['long_jump'])
+    # compute_roc_auc_from_sim(['long_jump'], path_sim_matrix='/export/home/mbautist/Desktop/long_jump/simMatrix_long_jump_tf_0.1conv_1fc_growingiter2_iter_20000_fc7_zscores.mat')
+    compute_roc_auc_from_sim(['discus_throw'], path_sim_matrix='/export/home/asanakoy/workspace/OlympicSports/sim/tf/discus_throw/simMatrix_discus_throw_1_rounds_3_rounds_20k_aug_fc7_zscores.mat')
+    # compute_roc_auc_from_sim(['long_jump'])
