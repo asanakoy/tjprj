@@ -40,8 +40,8 @@ class Centroider(object):
         """
         print "Calculating nearest representatives for each class..."
         self.batch_ldr = batch_ldr
-        self.mu = np.zeros((np.max(batch_ldr.labels)+1, 4096))
-        self.sigma = np.zeros((np.max(batch_ldr.labels)+1))
+        self.mu = np.zeros((np.max(batch_ldr.simple_batch_loader.labels)+1, 4096))
+        self.sigma = np.zeros((np.max(batch_ldr.simple_batch_loader.labels)+1))
 
     def updateCentroids(self, sess, in_ph, out_ph, batch_size=128):
         """
@@ -50,18 +50,18 @@ class Centroider(object):
         :return:
         """
 
-        for label in np.unique(self.batch_ldr.labels):
+        for label in np.unique(self.batch_ldr.simple_batch_loader.labels):
 
             print "Represenative for class {}...".format(label)
 
-            idx_class = np.nonzero(self.batch_ldr.labels == label)[0]
-            image_ids = np.asarray(self.batch_ldr.indexlist)[idx_class]
-            flip_values = np.asarray(self.batch_ldr.flip_values)[idx_class]
+            idx_class = np.nonzero(self.batch_ldr.simple_batch_loader.labels == label)[0]
+            image_ids = np.asarray(self.batch_ldr.simple_batch_loader.indexlist)[idx_class]
+            flip_values = np.asarray(self.batch_ldr.simple_batch_loader.flip_values)[idx_class]
             unq_vals, unq_idx = np.asarray(np.unique(image_ids, return_index=True))
             features = np.zeros((unq_idx.shape[0], 4096))
             image = np.empty((unq_idx.shape[0], 3, 227, 227), dtype=np.float32)
             for idx, i in enumerate(unq_idx):
-                image[idx, :, :, :] = self.batch_ldr.images_container.get_image(image_ids[i], flip_values[i])
+                image[idx, :, :, :] = self.batch_ldr.simple_batch_loader.images_container.get_image(image_ids[i], flip_values[i])
             features = self.get_feature(image, sess, in_ph, out_ph)
             self.mu[label] = self.get_centroid(features)
             self.sigma[label] = self.get_deviation(features, label)
