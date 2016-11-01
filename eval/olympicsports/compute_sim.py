@@ -12,7 +12,7 @@ import eval.olympicsports.utils
 
 
 def get_pathes(model_name, iteration=0, round_id=0, **params):
-    if round_id == 0:
+    if round_id is None:
         init_model_path = join('/export/home/asanakoy/workspace/OlympicSports/cnn/',
                                model_name,
                                params['category'], 'checkpoint-{}'.format(iteration))
@@ -39,9 +39,13 @@ def main(argv):
     else:
         category = 'long_jump'
     model_name = '3_rounds_20k_aug'
-    mat_path = '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/OlympicSports/crops/' + category + '/images_test.mat'
-    mean_path = join(
-        '/export/home/mbautist/Desktop/workspace/cnn_similarities/data/mat_files/cliqueCNN/' + category + '_batch_128_10trans_shuffleMB1shuffleALL_0/mat/mean.npy')
+    is_bbox_sq = 0
+    mat_path = '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/OlympicSports/crops/' + category + ('/images_227x227_bbox_sq.mat' if is_bbox_sq else '/images.mat')
+    if is_bbox_sq:
+        mean_path = join('/export/home/asanakoy/workspace/OlympicSports/cnn', model_name, category, 'mean.npy')
+    else:
+        mean_path = join(
+            '/export/home/mbautist/Desktop/workspace/cnn_similarities/data/mat_files/cliqueCNN/' + category + '_batch_128_10trans_shuffleMB1shuffleALL_0/mat/mean.npy')
     mean = np.load(mean_path)
 
     params = {
@@ -58,11 +62,11 @@ def main(argv):
         'device_id': '/gpu:{}'.format(int(argv[0]))
     }
     params['snapshot_path'], sim_output_path = get_pathes(model_name,
-                                                          iteration=0,
-                                                          round_id=1,
+                                                          iteration=20000,
+                                                          round_id=None,
                                                           **params)
     print 'Using Snapshot:', params['snapshot_path']
-
+    print 'Output sim matrix to', sim_output_path
     eval.features.compute_sim_and_save(sim_output_path, **params)
 
 
