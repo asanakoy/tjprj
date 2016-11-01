@@ -5,13 +5,23 @@ import PIL
 from PIL import Image
 import scipy.misc
 
+
 class ImageGetterFromMat:
     """
     Class for loading batches by index from mat file
     """
-    def __init__(self, mat_path):
+    def __init__(self, mat_path, load_all_in_memory=False):
         dataset = h5py.File(mat_path, 'r')
-        self.images_ref = dataset['images_mat']
+        has_images_mat = 'images_mat' in dataset
+        has_images = 'images' in dataset
+        if has_images_mat and has_images:
+            raise Exception('have two image matrix!')
+        if has_images_mat:
+            self.images_ref = dataset['images_mat']
+        else:
+            self.images_ref = dataset['images']
+        if load_all_in_memory:
+            self.images_ref = self.images_ref[...]
 
     def total_num_images(self):
         return self.images_ref.shape[0]
