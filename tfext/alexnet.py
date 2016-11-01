@@ -71,6 +71,7 @@ class Alexnet(object):
             print 'Loading Net Weights from: {}'.format(init_model)
             net_data = np.load(init_model).item()
 
+        self.global_iter_counter = tf.Variable(0, name='global_iter_counter', trainable=False)
         with tf.variable_scope('input'):
             self.x = tf.placeholder(tf.float32, (None,) + self.input_shape, name='x')
             self.y_gt = tf.placeholder(tf.int32, shape=(None,), name='y_gt')
@@ -308,11 +309,12 @@ class Alexnet(object):
             config.gpu_options.per_process_gpu_memory_fraction = gpu_memory_fraction
         self.sess = tf.Session(config=config)
 
-    def restore_from_snapshot(self, snapshot_path, num_layers):
+    def restore_from_snapshot(self, snapshot_path, num_layers, restore_iter_counter=False):
         """
         :param snapshot_path: path to the snapshot file
         :param num_layers: number layers to restore from the snapshot
                             (conv1 is the #1, fc8 is the #8)
+        :param restore_iter_counter: if True restore global_iter_counter from the snapshot
 
         WARNING! A call of sess.run(tf.initialize_all_variables()) after restoring from snapshot
                  will overwrite all variables and set them to initial state.
@@ -324,9 +326,12 @@ class Alexnet(object):
             return
         items = self.trainable_vars.items()
         items.sort()
-        print 'Restoring {} from the snapshot'.format(
-            [items[i][0] for i in xrange(num_layers * 2)])
-        saver = tf.train.Saver([items[i][1] for i in xrange(num_layers * 2)])
+        vars_names_to_restore = [items[i][0] for i in xrange(num_layers * 2)]
+        vars_to_restore = [items[i][1] for i in xrange(num_layers * 2)]
+        print 'Restoring {} from the snapshot'.format(vars_names_to_restore)
+        if restore_iter_counter:
+            vars_to_restore += [self.global_iter_counter]
+        saver = tf.train.Saver(var_list=vars_to_restore)
         saver.restore(self.sess, snapshot_path)
 
     def get_conv_weights(self, layer_index, net_data, kernel_height, kernel_width,

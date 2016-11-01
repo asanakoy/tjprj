@@ -158,11 +158,9 @@ def training(net, loss, base_lr=None, fc_lr_mult=1.0, conv_lr_mult=1.0, **params
     fc_grads = grads[len(conv_vars):]
     assert len(conv_grads) + len(fc_grads) == len(net.trainable_vars)
 
-    global_iter_counter = tf.Variable(0, name='global_iter_counter', trainable=False)
-
-    conv_tran_op = conv_optimizer.apply_gradients(zip(conv_grads, conv_vars),
-                                                  global_step=global_iter_counter)
-    fc_tran_op = fc_optimizer.apply_gradients(zip(fc_grads, fc_vars))
+    conv_tran_op = conv_optimizer.apply_gradients(zip(conv_grads, conv_vars))
+    fc_tran_op = fc_optimizer.apply_gradients(zip(fc_grads, fc_vars),
+                                              global_step=net.global_iter_counter)
     return tf.group(conv_tran_op, fc_tran_op)
 
 
