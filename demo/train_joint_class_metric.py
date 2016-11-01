@@ -102,12 +102,9 @@ def setup_network(**params):
             'summary': summary, 'mu_ph': mu_pl, 'unique_mu_ph': unique_mu_pl, 'sigma_ph': sigma_pl}
 
 
-
-
-
 def run_training_current_clustering(**params):
 
-    # plotter = Plotter(2, 2)
+    net = params['net']
     log_step = 1
     summary_step = 200
     print("Starting training...")
@@ -117,14 +114,14 @@ def run_training_current_clustering(**params):
 
         # Fill a feed dictionary with the actual set of images and labels
         # for this particular training step.
-        feed_dict = tfext.utils.fill_feed_dict_magnet(params['net'], params['mu_ph'], params['unique_mu_ph'], params['sigma_ph'], params['batch_ldr'], params['centroider'],
+        feed_dict = tfext.utils.fill_feed_dict_magnet(net, params['mu_ph'], params['unique_mu_ph'], params['sigma_ph'], params['batch_ldr'], params['centroider'],
                                                batch_size=params['batch_size'],
                                                phase='train')
 
         if step != 0 and step % 10000 == 0:
             # Update centroids with created network
             params['centroider'] = centroider.Centroider(params['batch_ldr'])
-            params['centroider'].updateCentroids(params['net'].sess, params['net'].x, params['net'].fc7)
+            params['centroider'].updateCentroids(net.sess, net.x, net.fc7)
 
         # Run one step of the model.  The return values are the activations
         # from the `train_op` (which is discarded) and the `loss` Op.  To
@@ -132,20 +129,23 @@ def run_training_current_clustering(**params):
         # in the list passed to sess.run() and the value tensors will be
         # returned in the tuple from the call.
         if step % summary_step == 0:
-            summary_str, _, loss_value = params['net'].sess.run([params['summary'], params['train_op'], params['loss']],
-                                                      feed_dict=feed_dict)
-            params['summary_writer'].add_summary(summary_str, step)
+            global_step, summary_str, _, loss_value = net.sess.run([net.global_iter_counter,
+                                                                    params['summary'],
+                                                                    params['train_op'],
+                                                                    params['loss']],
+                                                                    feed_dict=feed_dict)
+            params['summary_writer'].add_summary(summary_str, global_step=global_step)
             # summary_writer.flush()
         else:
-            _, loss_value = params['net'].sess.run([params['train_op'], params['loss']], feed_dict=feed_dict)
+            global_step, _, loss_value = net.sess.run([net.global_iter_counter,
+                                                       params['train_op'],
+                                                       params['loss']],
+                                                      feed_dict=feed_dict)
         duration = time.time() - start_time
-
-
-        duration_full = time.time() - start_time
         if step % log_step == 0 or step + 1 == params['max_iter']:
-            print('Step %d: loss = %.2f (%.3f s, %.2f im/s) (full: %.3f s)'
+            print('Step %d: loss = %.2f (%.3f s, %.2f im/s)'
                   % (step, loss_value, duration,
-                     params['batch_size'] / duration, duration_full))
+                     params['batch_size'] / duration))
     return params
 
 
@@ -189,7 +189,7 @@ def run_training(**params):
         # Restore from previous round model 
         if clustering_round > 0:
             checkpoint_file_round = checkpoint_file + '-' + str(clustering_round)
-            params['net'].restore_from_snapshot(checkpoint_file_round, 7)
+            params['net'].restore_from_snapshot(checkpoint_file_round, 7, restore_iter_counter=True)
 
         # Run training and save snapshot
         params = run_training_current_clustering(**params)
