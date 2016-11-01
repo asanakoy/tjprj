@@ -13,16 +13,18 @@ from eval.olympicsports.roc.roc_auc import covert_labels_to_dict, \
 def __get_similarity_score(feats, frame_id_a, frame_id_b, flipval):
     u = feats['features'][frame_id_a, ...]
     v = feats['features' if not flipval else 'features_flipped'][frame_id_b, ...]
-    return spdis.correlation(u, v)
+    return 2 - spdis.correlation(u, v)
 
 
 def compute_roc_auc_from_net(net, category, layer_names,
                              mat_path=None, mean_path=None,
                              batch_size=256,
-                             norm_method='zscores'):
+                             norm_method=None,
+                             load_all_in_memory=True):
     """Calculate ROC AUC on the current iteration of the net
     Args:
       net: network
+      load_all_in_memory: load all images from the category in memory
     Return: ROC AUC for the category
     """
     if mat_path is None:
@@ -36,6 +38,12 @@ def compute_roc_auc_from_net(net, category, layer_names,
     with h5py.File(labels_path, mode='r') as f:
         labels_dict = covert_labels_to_dict(f)
 
+    used_frame_ids = list(labels_dict['anchors'])
+    for ids in labels_dict['ids']:
+        used_frame_ids.extend(ids)
+    used_frame_ids = np.unique(used_frame_ids)
+    pos_lookup = {frame_id: pos for pos, frame_id in enumerate(used_frame_ids)}
+
     # Extracting features
     accepable_methods = [None, 'zscores', 'unit_norm']
     if norm_method not in accepable_methods:
@@ -47,12 +55,12 @@ def compute_roc_auc_from_net(net, category, layer_names,
         'mean': np.load(mean_path),
         'batch_size': batch_size,
         'im_shape': (227, 227),
-        'image_getter': eval.image_getter.ImageGetterFromMat(mat_path)
+        'image_getter': eval.image_getter.ImageGetterFromMat(mat_path, load_all_in_memory=load_all_in_memory)
     }
 
     feats = dict()
-    feats['features'] = eval.features.extract_features(False, net=net, **feats_params)
-    feats['features_flipped'] = eval.features.extract_features(True, net=net, **feats_params)
+    feats['features'] = eval.features.extract_features(False, net=net, frame_ids=used_frame_ids, **feats_params)
+    feats['features_flipped'] = eval.features.extract_features(True, net=net, frame_ids=used_frame_ids, **feats_params)
     stacked_features = dict()
     for key, val in feats.iteritems():
         stacked_features[key] = np.hstack(val.values())
@@ -68,7 +76,7 @@ def compute_roc_auc_from_net(net, category, layer_names,
     false_pos_rate_list = list()
     true_pos_rate_list = list()
     for i, anchor_id in enumerate(labels_dict['anchors']):
-        scores = [__get_similarity_score(feats, anchor_id, frame_id, flipval) for
+        scores = [__get_similarity_score(feats, pos_lookup[anchor_id], pos_lookup[frame_id], flipval) for
                   frame_id, flipval in
                   zip(labels_dict['ids'][i], labels_dict['flipvals'][i].astype(int))]
 

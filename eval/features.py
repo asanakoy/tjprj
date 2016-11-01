@@ -13,7 +13,9 @@ import tfext.utils
 import scipy.stats.mstats as stat
 import scipy.spatial.distance as spdis
 import sklearn
+import sklearn.preprocessing
 import scipy.io
+import math
 from tqdm import tqdm
 
 
@@ -64,7 +66,18 @@ def compute_sim_and_save(sim_output_path, norm_method, net=None, **params):
     scipy.io.savemat(sim_output_path, sim)
 
 
-def extract_features(flipped, net=None, **params):
+def extract_features(flipped, net=None, frame_ids=None, **params):
+    """
+    Extract features from the network.
+
+    Args:
+        flipped: are frames flipped?
+        net: if not None it will use this network to extract the features,
+          otherwise create new net and restore from teh snapshot
+        frame_ids: if None extract from all frames,
+          if a list of frames - extract features only for them
+        params:
+    """
     if not isinstance(params['layer_names'], list):
         raise TypeError('layer_names must be a list')
 
@@ -86,18 +99,17 @@ def extract_features(flipped, net=None, **params):
         tensors_to_get = [net.__getattribute__(name) for name in params['layer_names']]
         print 'Tensors to extract:', tensors_to_get
         d = dict()
-        total_num_images = params['image_getter'].total_num_images()
+        if frame_ids is None:
+            frame_ids = np.arange(params['image_getter'].total_num_images())
+
         for layer_name in params['layer_names']:
             tensor = net.__getattribute__(layer_name)
-            d[layer_name] = np.zeros((total_num_images, np.prod(tensor.get_shape()[1:])))
+            d[layer_name] = np.zeros((len(frame_ids), np.prod(tensor.get_shape()[1:])))
 
         print 'Running {} iterations with batch_size={}'.\
-            format(np.round(total_num_images / params['batch_size']), params['batch_size'])
-        for step, batch_start in \
-                tqdm(enumerate(range(0, total_num_images, params['batch_size']))):
-
-            batch_idxs = range(batch_start,
-                               min(batch_start + params['batch_size'], total_num_images))
+            format(int(math.ceil(len(frame_ids) / params['batch_size'])), params['batch_size'])
+        for step, batch_start in tqdm(enumerate(range(0, len(frame_ids), params['batch_size']))):
+            batch_idxs = frame_ids[batch_start:batch_start + params['batch_size']]
             batch = params['image_getter'].get_batch(batch_idxs,
                                                      resize_shape=params['im_shape'],
                                                      mean=params['mean'])
@@ -110,8 +122,10 @@ def extract_features(flipped, net=None, **params):
             }
 
             features = net.sess.run(tensors_to_get, feed_dict=feed_dict)
+            pos_begin = params['batch_size'] * step
+            pos_end = pos_begin + len(batch_idxs)
             for tensor_id, layer_name in enumerate(params['layer_names']):
-                d[layer_name][batch_idxs, ...] = features[tensor_id].reshape(len(batch_idxs), -1)
+                d[layer_name][pos_begin:pos_end, ...] = features[tensor_id].reshape(len(batch_idxs), -1)
 
         if is_temp_session:
             net.sess.close()
