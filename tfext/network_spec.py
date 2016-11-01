@@ -145,7 +145,9 @@ def training(net, loss, base_lr=None, fc_lr_mult=1.0, conv_lr_mult=1.0, **params
     # WARNING: initial_accumulator_value in caffe's AdaGrad is probably 0.0
     conv_optimizer = tf.train.AdagradOptimizer(base_lr * conv_lr_mult,
                                                initial_accumulator_value=0.0001)
-    fc_optimizer = tf.train.AdagradOptimizer(base_lr * fc_lr_mult, initial_accumulator_value=0.0001)
+    fc_optimizer = tf.train.AdagradOptimizer(base_lr * fc_lr_mult,
+                                             initial_accumulator_value=0.0001)
+
     print('Conv LR: {}, FC LR: {}'.format(base_lr * conv_lr_mult, base_lr * fc_lr_mult))
 
     assert len(net.trainable_vars) == len(tf.trainable_variables())
