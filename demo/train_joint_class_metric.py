@@ -21,6 +21,7 @@ from trainhelper import trainhelper
 import batch_loader_with_prefetch
 import matplotlib.pyplot as plt
 import gc
+import eval.caltech.eval_from_net
 
 
 def get_pathes(category, dataset):
@@ -73,31 +74,32 @@ def setup_network(**params):
         del params['net']
         del params['loss']
 
-    net = tfext.alexnet.Alexnet(**params)
+    with tf.Graph().as_default():
+        net = tfext.alexnet.Alexnet(**params)
 
-    # Loss for metric learning
-    logits = net.fc8
-    norm_fc7 = tf.nn.l2_normalize(net.fc7, dim=1)
-    mu_pl = tf.placeholder(tf.float32, (None, 4096))
-    unique_mu_pl = tf.placeholder(tf.float32, (None, 4096))
-    sigma_pl = tf.placeholder(tf.float32, (1,))
-    loss = network_spec.loss_generative_discriminative(norm_fc7, logits, mu_pl, unique_mu_pl, sigma_pl, net.y_gt)
+        # Loss for metric learning
+        logits = net.fc8
+        norm_fc7 = tf.nn.l2_normalize(net.fc7, dim=1)
+        mu_pl = tf.placeholder(tf.float32, (None, 4096))
+        unique_mu_pl = tf.placeholder(tf.float32, (None, 4096))
+        sigma_pl = tf.placeholder(tf.float32, (1,))
+        loss = network_spec.loss_generative_discriminative(norm_fc7, logits, mu_pl, unique_mu_pl, sigma_pl, net.y_gt)
 
-    # Group losses
-    train_op = network_spec.training(net, loss, **params)
+        # Group losses
+        train_op = network_spec.training(net, loss, **params)
 
-    # Add the Op to compare the logits to the labels during correct_classified_top1.
-    eval_correct_top1 = network_spec.correct_classified_top1(logits, net.y_gt)
-    accuracy = tf.cast(eval_correct_top1, tf.float32) / \
-               tf.constant(params['batch_size'], dtype=tf.float32)
+        # Add the Op to compare the logits to the labels during correct_classified_top1.
+        eval_correct_top1 = network_spec.correct_classified_top1(logits, net.y_gt)
+        accuracy = tf.cast(eval_correct_top1, tf.float32) / \
+                   tf.constant(params['batch_size'], dtype=tf.float32)
 
-    saver = tf.train.Saver()
+        saver = tf.train.Saver()
 
-    # Instantiate a SummaryWriter to output summaries and the Graph of the current sesion.
-    summary_writer = tf.train.SummaryWriter(params['output_dir'], net.sess.graph)
-    summary = tf.scalar_summary(['loss', 'batch_accuracy'], [loss, accuracy])
+        # Instantiate a SummaryWriter to output summaries and the Graph of the current sesion.
+        summary_writer = tf.train.SummaryWriter(params['output_dir'], net.sess.graph)
+        summary = tf.scalar_summary(['loss', 'batch_accuracy'], [loss, accuracy])
 
-    net.sess.run(tf.initialize_all_variables())
+        net.sess.run(tf.initialize_all_variables())
     return {'net': net, 'train_op': train_op, 'loss': loss, 'saver': saver, 'summary_writer': summary_writer,
             'summary': summary, 'mu_ph': mu_pl, 'unique_mu_ph': unique_mu_pl, 'sigma_ph': sigma_pl}
 
@@ -107,6 +109,7 @@ def run_training_current_clustering(**params):
     net = params['net']
     log_step = 1
     summary_step = 200
+
     print("Starting training...")
     for step in xrange(params['max_iter']):
 
@@ -142,6 +145,17 @@ def run_training_current_clustering(**params):
                                                        params['loss']],
                                                       feed_dict=feed_dict)
         duration = time.time() - start_time
+
+        if step % params['test_step'] == 0 or step + 1 == params['max_iter']:
+            nn_acc = eval.caltech.eval_from_net.nn_acc(net,
+                                                      params['category'],
+                                                      ['fc7'],
+                                                      mat_path=params['images_mat_filepath'],
+                                                      mean_path=params['mean_filepath'],
+                                                      batch_size=256)
+            params['summary_writer'].add_summary(tfext.utils.create_sumamry('NNACC', nn_acc), global_step=global_step)
+            params['summary_writer'].flush()
+
         if step % log_step == 0 or step + 1 == params['max_iter']:
             print('Step %d: loss = %.2f (%.3f s, %.2f im/s)'
                   % (step, loss_value, duration,
@@ -162,12 +176,12 @@ def run_training(**params):
 
         # Use HOGLDA for initial estimate of similarities
         if clustering_round == 0:
-            matrices = trainhelper.get_step_similarities(0, None, params['category'], None,
+            matrices = trainhelper.get_step_similarities(0, None, params['category'], params['dataset'], None,
                                                          pathtosim=params_clustering['pathtosim'],
                                                          pathtosim_avg=params_clustering['pathtosim_avg'])
         else:
             matrices = trainhelper.get_step_similarities(clustering_round, params['net'],
-                                                         params['category'], ['fc7'])
+                                                         params['category'], params['dataset'],['fc7'])
 
         # Run clustering and update corresponding param fields
         params_clustering.update(matrices)
@@ -205,8 +219,8 @@ def main(argv):
     if len(argv) > 1:
         category = argv[1]
     else:
-        category = 'long_jump'
-    dataset = 'OlympicSports'
+        category = 'Caltech101'
+    dataset = 'Caltech101'
 
     data_path, indices_dir, output_dir = get_pathes(category, dataset)
     mean_path = os.path.join(indices_dir, 'mean.npy')
@@ -216,28 +230,29 @@ def main(argv):
 
     params = {
         'im_shape': (227, 227, 3),
-        'batch_size': 128,
+        'batch_size': 64,
         'base_lr': 0.001,
         'fc_lr_mult': 1.0,
-        'conv_lr_mult': 0.1,
+        'conv_lr_mult': 1.0,
         'num_layers_to_init': 7,
         'dataset': dataset,
         'category': category,
         'num_classes': None,
         'snapshot_iter': 2000,
-        'max_iter': 10,
+        'max_iter': 20000,
         'indexing_1_based': 0,
         'images_mat_filepath': data_path,
         'indexfile_path': None,
         'mean_filepath': mean_path,
         'seed': 1988,
+        'test_step': 20000,
         'output_dir': output_dir,
         'init_model': get_first_model_path(dataset),
         'device_id': '/gpu:{}'.format(int(argv[0])),
         'gpu_memory_fraction': 0.4,
         'shuffle_every_epoch': False,
-        'online_augmentations': True,
-        'async_preload': True,
+        'online_augmentations': False,
+        'async_preload': False,
         'num_data_workers': 5,
         'batch_ldr': None,
         'augmenter_params': dict(hflip=True, vflip=False,

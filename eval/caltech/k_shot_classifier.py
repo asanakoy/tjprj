@@ -90,10 +90,11 @@ class ZeroShotClassifier(object):
         Initialize with similarity matrix and labels
         :return:
         """
-        print 'Calculating sim matrix'
+
 
         # if simMatrix is not input, calculate it
         if simMatrix.shape[0] != simMatrix.shape[1]:
+            print "Initialized with features, calculating sim matrix..."
             simMatrix = np.float32(2.0 - spdis.squareform(spdis.pdist(simMatrix, 'correlation')))
         self.simMatrix = simMatrix
         self.labels = y
@@ -139,7 +140,7 @@ class ZeroShotClassifier(object):
             for idx, nn in enumerate(sorted_nns[test_sample, :]):
                 if nn == idxs_test[test_sample]:
                     continue
-                votes_per_label[np.int32(self.labels[nn])] += weight[idx]
+                votes_per_label[np.int32(self.labels[np.int32(nn)])] += weight[idx]
             pred_labels[test_sample, :] = np.asarray(votes_per_label.values())
 
         # Get maximal predicted label for each test sample and return acc

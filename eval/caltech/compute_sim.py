@@ -17,16 +17,14 @@ def get_pathes(model_name, iteration=0, round_id=0, **params):
                                model_name,
                                params['category'], 'checkpoint-{}'.format(iteration))
 
-        sim_output_path = join('/export/home/asanakoy/workspace/OlympicSports/sim/tf/',
+        sim_output_path = join('/export/home/mbautist/Desktop/',
                                params['category'], 'simMatrix_{}_{}_iter_{}_{}_{}.mat'.
                                format(params['category'], model_name, iteration,
                                       ''.join(params['layer_names']), params['norm_method']))
     else:
-        init_model_path = join('/export/home/asanakoy/workspace/OlympicSports/cnn/',
-                               model_name,
-                               params['category'], 'checkpoint-{}'.format(round_id))
+        init_model_path = join('/export/home/mbautist/tmp/tf_test/Caltech101/checkpoint-1')
 
-        sim_output_path = join('/export/home/asanakoy/workspace/OlympicSports/sim/tf/',
+        sim_output_path = join('/export/home/mbautist/Desktop/',
                                params['category'], 'simMatrix_{}_{}_rounds_{}_{}_{}.mat'.
                                format(params['category'], round_id, model_name,
                                       ''.join(params['layer_names']), params['norm_method']))
@@ -37,10 +35,13 @@ def main(argv):
     if len(argv) > 1:
         category = argv[1]
     else:
-        category = 'long_jump'
-    model_name = '3_rounds_20k_aug'
+        category = 'Caltech101'
+    model_name = 'iter1'
     is_bbox_sq = 0
-    mat_path = '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/OlympicSports/crops/' + category + ('/images_227x227_bbox_sq.mat' if is_bbox_sq else '/images.mat')
+
+    mat_path = '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/Caltech101/crops/Caltech101/images_mat.mat'
+
+
     if is_bbox_sq:
         mean_path = join('/export/home/asanakoy/workspace/OlympicSports/cnn', model_name, category, 'mean.npy')
     else:
@@ -59,11 +60,11 @@ def main(argv):
         'batch_size': 256,
         'use_batch_norm': False,
         'gpu_memory_fraction': 0.35,
-        'device_id': '/gpu:{}'.format(int(argv[0]))
+        'device_id': '/gpu:{}'.format(0)
     }
     params['snapshot_path'], sim_output_path = get_pathes(model_name,
-                                                          iteration=20000,
-                                                          round_id=None,
+                                                          iteration=40000,
+                                                          round_id=2,
                                                           **params)
     print 'Using Snapshot:', params['snapshot_path']
     print 'Output sim matrix to', sim_output_path
