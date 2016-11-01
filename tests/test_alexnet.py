@@ -46,7 +46,7 @@ if __name__ == '__main__':
     net = tfext.alexnet.Alexnet(**params)
 
     cross_entropy = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(net.fc8, net.y_gt))
-    train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
+    train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy, global_step=net.global_iter_counter)
     # train_step = tf.train.AdagradOptimizer(1e-4).minimize(cross_entropy)
     correct_prediction = tf.equal(tf.cast(tf.argmax(net.prob, 1), tf.int32), net.y_gt)
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
@@ -67,25 +67,24 @@ if __name__ == '__main__':
         # y = label_binarize(y, classes=range(1000))
 
         if i % 1 == 0:
-            train_accuracy = accuracy.eval(session=net.sess,
-                                           feed_dict={
-                                               net.x: batch,
-                                               net.y_gt: y,
-                                               net.fc6_keep_prob: 1.0,
-                                               net.fc7_keep_prob: 1.0,
-                                               net.is_phase_train: False})
-            print("step %d, training accuracy %f" % (i, train_accuracy))
+            _, global_iter = net.sess.run([train_step, net.global_iter_counter],
+                                          feed_dict={net.x: batch,
+                                                     net.y_gt: y,
+                                                     net.fc6_keep_prob: 0.5,
+                                                     net.fc7_keep_prob: 0.5,
+                                                     net.is_phase_train: True})
 
-        train_step.run(session=net.sess,
-                       feed_dict={net.x: batch,
-                                  net.y_gt: y,
-                                  net.fc6_keep_prob: 0.5,
-                                  net.fc7_keep_prob: 0.5,
-                                  net.is_phase_train: True})
+            train_accuracy, global_iter = net.sess.run([accuracy, net.global_iter_counter],
+                                                       feed_dict={net.x: batch,
+                                                       net.y_gt: y,
+                                                       net.fc6_keep_prob: 1.0,
+                                                       net.fc7_keep_prob: 1.0,
+                                                       net.is_phase_train: False})
+        print("step %d, training accuracy %f" % (global_iter, train_accuracy))
 
-    from trainhelper.trainhelper import get_sim
-    d = get_sim(net, 'long_jump', ['fc7'], return_features=False)
-    print d.keys()
+    # from trainhelper.trainhelper import get_sim
+    # d = get_sim(net, 'long_jump', ['fc7'], return_features=False)
+    # print d.keys()
 
     # print("test accuracy %g" % accuracy.eval(feed_dict={
     #     x: mnist.test.images, y_: mnist.test.labels, keep_prob: 1.0}))
