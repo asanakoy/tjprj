@@ -102,7 +102,7 @@ def run_training_current_clustering(**params):
 
     # plotter = Plotter(2, 2)
     log_step = 1
-    summary_step = 200
+    summary_step = 75
     for step in xrange(params['max_iter']):
 
         start_time = time.time()
@@ -157,15 +157,17 @@ def run_training(**params):
 
         # Use HOGLDA for initial estimate of similarities
         if clustering_round == 0:
-            matrices = trainhelper.get_step_similarities(0, None, params['category'], None,
+            matrices = trainhelper.get_step_similarities(0, None, params['category'], params['dataset'], None,
                                                          pathtosim=params_clustering['pathtosim'],
                                                          pathtosim_avg=params_clustering['pathtosim_avg'])
         else:
-            matrices = trainhelper.get_step_similarities(clustering_round, params['net'], params['category'], ['fc7'])
+            matrices = trainhelper.get_step_similarities(clustering_round, params['net'], params['category'],
+                                                         params['dataset'], ['fc7'])
 
         # Run clustering and update corresponding param fields
         params_clustering.update(matrices)
         params_clustering['clustering_round'] = clustering_round
+        params_clustering['output_dir'] = params['output_dir']
         batch_ldr_dict_params, params_clustering = trainhelper.runClustering(**params_clustering)
         params['indexfile_path'] = batch_ldr_dict_params
         params['num_classes'] = batch_ldr_dict_params['labels'].max() + 1
@@ -198,7 +200,7 @@ def main(argv):
     dataset = 'OlympicSports'
 
     # should we use crops that were cropped using the biggest square bounding box around the person
-    is_bbox_sq = 1
+    is_bbox_sq = True
 
     data_path, mean_path, output_dir = get_pathes(category, dataset, is_bbox_sq)
 
@@ -216,7 +218,7 @@ def main(argv):
         'category': category,
         'num_classes': None,
         'max_iter': 10000,
-        'test_step': 10000,
+        'test_step': 500,
         'num_clustering_rounds': 1,
         'indexing_1_based': 0,
         'images_mat_filepath': data_path,
@@ -231,8 +233,8 @@ def main(argv):
         'async_preload': True,
         'num_data_workers': 5,
         'gpu_memory_fraction': 0.4,
-        'augmenter_params': dict(hflip=True, vflip=False,
-                                 scale_to_percent=(0.7, 1.3),
+        'augmenter_params': dict(hflip=False, vflip=False,
+                                 scale_to_percent=(0.9, 1.1),
                                  scale_axis_equally=True,
                                  rotation_deg=10, shear_deg=7,
                                  translation_x_px=30, translation_y_px=30)
