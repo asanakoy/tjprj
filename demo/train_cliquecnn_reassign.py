@@ -122,7 +122,7 @@ def run_training_current_clustering(**params):
         else:
             _, loss_value = params['net'].sess.run([params['train_op'], params['loss']], feed_dict=feed_dict)
 
-        if step % params['test_step'] == 0:
+        if step % params['test_step'] == 0 or step + 1 == params['max_iter']:
             roc_auc = eval.olympicsports.roc. \
                 roc_from_net.compute_roc_auc_from_net(params['net'],
                                                       params['category'],
@@ -147,12 +147,12 @@ def run_training(**params):
 
     params_clustering = trainhelper.get_params_clustering(params['dataset'], params['category'])
 
-    for clustering_round in range(0, 5):
+    for clustering_round in range(0, params['num_clustering_rounds']):
 
         params['clustering_round'] = 'clustering_round'
         # Delete old batch_ldr, recompute clustering and create new batch_ldr
         if 'batch_ldr' in params:
-            params['batch_ldr']
+            del params['batch_ldr']
             gc.collect()
 
         # Use HOGLDA for initial estimate of similarities
@@ -217,6 +217,7 @@ def main(argv):
         'num_classes': None,
         'max_iter': 10000,
         'test_step': 10000,
+        'num_clustering_rounds': 1,
         'indexing_1_based': 0,
         'images_mat_filepath': data_path,
         'indexfile_path': None,
