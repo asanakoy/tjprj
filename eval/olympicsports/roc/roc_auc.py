@@ -106,7 +106,7 @@ def compute_roc(d, sim):
     return avg_roc_auc, interp_roc_auc, roc_auc_list
 
 
-def compute_roc_auc_from_sim(argv, path_sim_matrix=None):
+def compute_roc_auc_from_sim(argv, path_sim_matrix=None, is_quiet=False):
     if len(argv) == 0:
         category = 'long_jump'
     else:
@@ -120,6 +120,8 @@ def compute_roc_auc_from_sim(argv, path_sim_matrix=None):
         path_sim_matrix = join(dataset_root, 'sim/tf/', suffix, category,
                                'simMatrix_{}_tf_0.1conv_1fc_{}iter_{}_fc7_zscores.mat'.format(
                                    category, suffix + '_' if len(suffix) else '', iter_id))
+    if not is_quiet:
+        print 'Sim matrix path:', path_sim_matrix
     sim = scipy.io.loadmat(path_sim_matrix)
 
     labels_path = join(dataset_root,
@@ -154,7 +156,7 @@ def run_all_cat():
     categories = sorted(categories)
     for cat in categories:
         try:
-            compute_roc_auc_from_sim([cat])
+            compute_roc_auc_from_sim([cat], is_quiet=True)
         except IOError as e:
             print e
 
