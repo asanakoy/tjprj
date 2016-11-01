@@ -71,9 +71,9 @@ class Plotter:
 def setup_network(**params):
 
     # If a network exists clear all ops, variables and tensors before creating a new instance
+    tf.reset_default_graph()
     if 'net' in params.keys():
         params['net'].sess.close()
-        tf.reset_default_graph()
         del params['net']
         del params['loss']
         del params['train_op']
@@ -100,7 +100,7 @@ def setup_network(**params):
 
 def run_training_current_clustering(**params):
 
-    # plotter = Plotter(2, 2)
+    net = params['net']
     log_step = 1
     summary_step = 75
     for step in xrange(params['max_iter']):
@@ -116,9 +116,12 @@ def run_training_current_clustering(**params):
         # in the list passed to sess.run() and the value tensors will be
         # returned in the tuple from the call.
         if step % summary_step == 0:
-            summary_str, _, loss_value = params['net'].sess.run([params['summary'], params['train_op'], params['loss']],
-                                                      feed_dict=feed_dict)
-            params['summary_writer'].add_summary(summary_str, step)
+            global_step, summary_str, _, loss_value = params['net'].sess.run([net.global_iter_counter,
+                                                                              params['summary'],
+                                                                              params['train_op'],
+                                                                              params['loss']],
+                                                                              feed_dict=feed_dict)
+            params['summary_writer'].add_summary(summary_str, global_step=global_step)
         else:
             _, loss_value = params['net'].sess.run([params['train_op'], params['loss']], feed_dict=feed_dict)
 
@@ -131,7 +134,8 @@ def run_training_current_clustering(**params):
                                                       mean_path=params['mean_filepath'],
                                                       batch_size=256,
                                                       norm_method=None)
-            params['summary_writer'].add_summary(tfext.utils.create_sumamry('ROCAUC', roc_auc), step)
+            params['summary_writer'].add_summary(tfext.utils.create_sumamry('ROCAUC', roc_auc),
+                                                 global_step=global_step)
             params['summary_writer'].flush()
             print('Step %d: ROCAUC = %.2f' % (step, roc_auc))
 
@@ -180,7 +184,7 @@ def run_training(**params):
         # Restore from previous round model
         if clustering_round > 0:
             checkpoint_file_round = checkpoint_file + '-' + str(clustering_round)
-            params['net'].restore_from_snapshot(checkpoint_file_round, 7)
+            params['net'].restore_from_snapshot(checkpoint_file_round, 7, restore_iter_counter=True)
 
         # Run training and save snapshot
         params = run_training_current_clustering(**params)
