@@ -117,7 +117,7 @@ def get_params_clustering(dataset, category):
             'imagePath': imnames,
             'pathToFolder': pathtocrops,
             'init_nCliques': 10,
-            'init_nBatches': 100,
+            'init_nbatches': 100,
             'max_cliques_per_batch': 8,
             'batch_size': 128,
             'nSamples': 8,
