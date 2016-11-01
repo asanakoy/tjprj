@@ -71,7 +71,15 @@ def get_step_similarities(step, net, category, dataset, layers, pathtosim=None, 
             flipMatrix = data['flipval'][()]
         return {'simMatrix': simMatrix, 'flipMatrix': flipMatrix}
     else:
-        d = get_sim(net, category, layers, return_features=False)
+        if dataset.startswith('Caltech'):
+            pars = {
+            'mat_path': '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/{}/crops/{}/images_mat.mat'.format(dataset,category),
+            'data_dir': join(
+                '/export/home/mbautist/Desktop/workspace/cnn_similarities/data/mat_files/cliqueCNN/{}_batch_128_10trans_shuffleMB1shuffleALL_0/mat/'.format(dataset)),
+            }
+            d = get_sim(net, category, layers, return_features=False, **pars)
+        else:
+            d = get_sim(net, category, layers, return_features=False)
         simMatrix_joined = np.dstack((d['simMatrix'], d['simMatrix_flip']))
         flipMatrix = simMatrix_joined.argmax(axis=2)
         simMatrix = simMatrix_joined.max(axis=2)
@@ -109,6 +117,9 @@ def get_params_clustering(dataset, category):
             'imagePath': imnames,
             'pathToFolder': pathtocrops,
             'init_nCliques': 10,
+            'init_nBatches': 100,
+            'max_cliques_per_batch': 8,
+            'batch_size': 128,
             'nSamples': 8,
             'anchors': anchors,
             'sampled_nbatches': 1000,
@@ -131,8 +142,11 @@ def get_params_clustering(dataset, category):
             'seqNames': None,
             'imagePath': imnames,
             'pathToFolder': pathtocrops,
-            'init_nCliques': 10,
-            'nSamples': 5,
+            'init_nCliques': 5,
+            'init_nbatches': 20,
+            'max_cliques_per_batch': 8,
+            'batch_size': 64,
+            'nSamples': 8,
             'anchors': None,
             'sampled_nbatches': 1000,
             'dataset': dataset,
@@ -153,7 +167,7 @@ def runClustering(**params_clustering):
     """
     if params_clustering['clustering_round'] == 0:
         generator = BatchGenerator(**params_clustering)
-        init_batches = generator.generateBatches(init_nbatches=100)
+        init_batches = generator.generateBatches(params_clustering['init_nbatches'])
         params_clustering['batches'] = init_batches
         params_clustering['sampler'] = BatchSampler(**params_clustering)
         params_clustering['sampler'].updateCliqueSampleProb(
@@ -172,8 +186,8 @@ def runClustering(**params_clustering):
     label = np.empty(0, dtype=np.int64)
     for i in range(params_clustering['sampled_nbatches']):
         print "Sampling batch {}".format(i)
-        batch = params_clustering['sampler'].sampleBatch(batch_size=128,
-                                                         max_cliques_per_batch=8,
+        batch = params_clustering['sampler'].sampleBatch(params_clustering['batch_size'],
+                                                         params_clustering['max_cliques_per_batch'],
                                                          mode='random')
         _x, _f, _y = params_clustering['sampler'].parse_to_list(batch)
         indices = np.append(indices, _x.astype(dtype=np.int64))
