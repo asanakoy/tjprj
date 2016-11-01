@@ -102,25 +102,17 @@ def run_training(**params):
             # in the list passed to sess.run() and the value tensors will be
             # returned in the tuple from the call.
             if step % summary_step == 0:
-                summary_str, _, loss_value = net.sess.run([summary, train_op, loss],
+                global_step, summary_str, _, loss_value = net.sess.run([net.global_iter_counter, summary, train_op, loss],
                                                           feed_dict=feed_dict)
-                summary_writer.add_summary(summary_str, step)
-                # summary_writer.flush()
+                summary_writer.add_summary(summary_str, global_step=global_step)
             else:
-                _, loss_value = net.sess.run([train_op, loss], feed_dict=feed_dict)
+                global_step, _, loss_value = net.sess.run([net.global_iter_counter, train_op, loss], feed_dict=feed_dict)
             duration = time.time() - start_time
 
             if step != 0 and \
                     (step + 1 % params['snapshot_iter'] == 0 or step + 1 == params['max_iter']):
                 checkpoint_file = os.path.join(params['output_dir'], 'checkpoint')
-                saver.save(net.sess, checkpoint_file, global_step=step + 1)
-                # Evaluate against the training set.
-                print('Training Data Eval:')
-                tfext.utils.calc_acuracy(net, net.sess,
-                                         eval_correct_top1,
-                                         batch_ldr,
-                                         batch_size=params['batch_size'],
-                                         num_images=1000)
+                saver.save(net.sess, checkpoint_file, global_step=global_step)
 
             duration_full = time.time() - start_time
             if step % log_step == 0 or step + 1 == params['max_iter']:
