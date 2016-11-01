@@ -127,10 +127,10 @@ def run_training_current_clustering(**params):
                 roc_from_net.compute_roc_auc_from_net(params['net'],
                                                       params['category'],
                                                       ['fc7'],
-                                                      mat_path=None,
-                                                      mean_path=None,
+                                                      mat_path=params['images_mat_filepath'],
+                                                      mean_path=params['mean_filepath'],
                                                       batch_size=256,
-                                                      norm_method='zscores')
+                                                      norm_method=None)
             params['summary_writer'].add_summary(tfext.utils.create_sumamry('ROCAUC', roc_auc), step)
             params['summary_writer'].flush()
             print('Step %d: ROCAUC = %.2f' % (step, roc_auc))
