@@ -9,6 +9,7 @@ from clustering.batchsampler import BatchSampler
 from clustering.clique import Clique
 import cPickle as pickle
 import os
+from tqdm import tqdm
 
 
 def get_sim(net, category, layer_names, **args):
@@ -79,6 +80,7 @@ def get_step_similarities(step, net, category, dataset, layers, pathtosim=None, 
             }
             d = get_sim(net, category, layers, return_features=False, **pars)
         else:
+            # TODO: if we use crops bbox_sq than change the pathes to mat_file and mean here
             d = get_sim(net, category, layers, return_features=False)
         simMatrix_joined = np.dstack((d['simMatrix'], d['simMatrix_flip']))
         flipMatrix = simMatrix_joined.argmax(axis=2)
@@ -184,8 +186,8 @@ def runClustering(**params_clustering):
     indices = np.empty(0, dtype=np.int64)
     flipped = np.empty(0, dtype=np.bool)
     label = np.empty(0, dtype=np.int64)
-    for i in range(params_clustering['sampled_nbatches']):
-        print "Sampling batch {}".format(i)
+    print 'Sampling batches'
+    for i in tqdm(range(params_clustering['sampled_nbatches'])):
         batch = params_clustering['sampler'].sampleBatch(params_clustering['batch_size'],
                                                          params_clustering['max_cliques_per_batch'],
                                                          mode='random')
@@ -194,6 +196,5 @@ def runClustering(**params_clustering):
         flipped = np.append(flipped, _f.astype(dtype=np.bool))
         label = np.append(label, _y.astype(dtype=np.int64))
 
-    assert indices.shape[0] == flipped.shape[0] == label.shape[
-        0], "Corrupted arguments for batch loader"
+    assert indices.shape[0] == flipped.shape[0] == label.shape[0], "Corrupted arguments for batch loader"
     return {'idxs': indices, 'flipvals': flipped, 'labels': label}, params_clustering

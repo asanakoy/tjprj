@@ -106,9 +106,11 @@ def extract_features(flipped, net=None, frame_ids=None, **params):
             tensor = net.__getattribute__(layer_name)
             d[layer_name] = np.zeros((len(frame_ids), np.prod(tensor.get_shape()[1:])))
 
+        num_batches = int(math.ceil(len(frame_ids) / params['batch_size']))
         print 'Running {} iterations with batch_size={}'.\
-            format(int(math.ceil(len(frame_ids) / params['batch_size'])), params['batch_size'])
-        for step, batch_start in tqdm(enumerate(range(0, len(frame_ids), params['batch_size']))):
+            format(num_batches, params['batch_size'])
+        for step, batch_start in tqdm(enumerate(range(0, len(frame_ids), params['batch_size'])),
+                                      total=num_batches):
             batch_idxs = frame_ids[batch_start:batch_start + params['batch_size']]
             batch = params['image_getter'].get_batch(batch_idxs,
                                                      resize_shape=params['im_shape'],
