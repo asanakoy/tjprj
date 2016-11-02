@@ -41,7 +41,6 @@ def get_first_model_path(dataset):
     if dataset == 'OlympicSports':
         return '/export/home/asanakoy/workspace/tfprj/data/bvlc_alexnet.npy'
     elif dataset == 'VOC':
-        # we need to convert WangVideoTriplet/color_model.caffemodel
         raise NotImplementedError
         return None
 
@@ -84,7 +83,7 @@ def run_training(**params):
 
         batch_ldr = batch_loader.BatchLoader(params)
 
-        plotter = Plotter(2, 2)
+        # plotter = Plotter(2, 2)
         log_step = 1
         summary_step = 200
         for step in xrange(params['max_iter']):
@@ -96,15 +95,11 @@ def run_training(**params):
                                                    batch_size=params['batch_size'],
                                                    phase='train')
 
-            # Run one step of the model.  The return values are the activations
-            # from the `train_op` (which is discarded) and the `loss` Op.  To
-            # inspect the values of your Ops or variables, you may include them
-            # in the list passed to sess.run() and the value tensors will be
-            # returned in the tuple from the call.
             if step % summary_step == 0:
                 global_step, summary_str, _, loss_value = net.sess.run([net.global_iter_counter, summary, train_op, loss],
                                                           feed_dict=feed_dict)
                 summary_writer.add_summary(summary_str, global_step=global_step)
+                # summary_writer.flush()
             else:
                 global_step, _, loss_value = net.sess.run([net.global_iter_counter, train_op, loss], feed_dict=feed_dict)
             duration = time.time() - start_time
