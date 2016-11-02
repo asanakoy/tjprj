@@ -52,22 +52,6 @@ def get_first_model_path(dataset):
         return None
 
 
-class Plotter:
-    def __init__(self, r, c):
-        plt.ion()
-        self.f, self.axes = plt.subplots(r, c)
-        self.styles = ['bo-', 'ro-'] * (r*c)
-        self.axes = self.axes.reshape(-1)
-
-    def plot(self, it, data):
-        for i, (key, val) in enumerate(data.iteritems()):
-            self.axes[i].plot(it, val, self.styles[i], label=key)
-            if iter == 0:
-                self.axes[i].set_xlabel('Iteration')
-                self.axes[i].legend()
-        plt.pause(0.0000001)
-
-
 def setup_network(**params):
 
     # If a network exists clear all ops, variables and tensors before creating a new instance
@@ -123,7 +107,7 @@ def run_training_current_clustering(**params):
                                                                               feed_dict=feed_dict)
             params['summary_writer'].add_summary(summary_str, global_step=global_step)
         else:
-            _, loss_value = params['net'].sess.run([params['train_op'], params['loss']], feed_dict=feed_dict)
+            global_step, _, loss_value = params['net'].sess.run([net.global_iter_counter, params['train_op'], params['loss']], feed_dict=feed_dict)
 
         if step % params['test_step'] == 0 or step + 1 == params['max_iter']:
             roc_auc = eval.olympicsports.roc. \
@@ -150,10 +134,11 @@ def run_training_current_clustering(**params):
 def run_training(**params):
 
     params_clustering = trainhelper.get_params_clustering(params['dataset'], params['category'])
+    # set num batches of cliques to number of anchors
+    params_clustering['init_nbatches'] = len(params_clustering['anchors']['anchor'])
 
     for clustering_round in range(0, params['num_clustering_rounds']):
 
-        params['clustering_round'] = 'clustering_round'
         # Delete old batch_ldr, recompute clustering and create new batch_ldr
         if 'batch_ldr' in params:
             del params['batch_ldr']
@@ -204,7 +189,7 @@ def main(argv):
     dataset = 'OlympicSports'
 
     # should we use crops that were cropped using the biggest square bounding box around the person
-    is_bbox_sq = True
+    is_bbox_sq = False
 
     data_path, mean_path, output_dir = get_pathes(category, dataset, is_bbox_sq)
 
