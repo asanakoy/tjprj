@@ -82,10 +82,11 @@ if __name__ == '__main__':
         print "step {}, training accuracy {:.2f}: {}".format(global_iter, train_accuracy, probs[:, 0])
         print "step {}, test accuracy     {:.2f}: {}".format(global_iter, test_accuracy, test_probs[:, 0])
         if i % 600 == 0:
-            net.reset_last_layer()
+            net.reset_fc12()
 
     saver = tf.train.Saver()
     checkpoint_prefix = os.path.expanduser('~/tmp/tmp-checkpoint-tensorflow-test')
     saver.save(net.sess, checkpoint_prefix, global_step=1, write_meta_graph=False)
     net.restore_from_snapshot(checkpoint_prefix + '-1', 12)
-    net.reset_last_layer()
+    net.reset_fc12()
+    net.reset_fc_stl10()

@@ -118,12 +118,23 @@ class Stlnet(object):
                                      weight_std=0.01, bias_init_value=0.0,
                                      name='fc12')[0]
 
+            self.fc_stl10 = self.fc_relu(dropout11,
+                                     num_outputs=10,
+                                     relu=False,
+                                     weight_std=0.01, bias_init_value=0.0,
+                                     name='fc_stl10')[0]
+
             with tf.variable_scope('output'):
                 self.prob = tf.nn.softmax(self.fc12, name='prob')
+                self.prob_stl10 = tf.nn.softmax(self.fc_stl10, name='prob_stl10')
 
             fc12_w = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "fc12/weight:0")[0]
             fc12_b = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "fc12/bias:0")[0]
             self.reset_fc12_op = tf.initialize_variables([fc12_w, fc12_b], name='reset_fc12')
+
+            fc12_w = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "fc_stl10/weight:0")[0]
+            fc12_b = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "fc_stl10/bias:0")[0]
+            self.reset_fc_stl10_op = tf.initialize_variables([fc12_w, fc12_b], name='reset_fc_stl10')
 
         self.graph = tf.get_default_graph()
         config = tf.ConfigProto(log_device_placement=False,
@@ -153,11 +164,16 @@ class Stlnet(object):
         saver = tf.train.Saver()
         saver.restore(self.sess, snapshot_path)
         if num_layers == 11:
-            self.reset_last_layer()
+            self.reset_fc12()
+            self.reset_fc_stl10()
 
-    def reset_last_layer(self):
+    def reset_fc12(self):
         print 'Resetting fc12 to random'
         self.sess.run(self.reset_fc12_op)
+
+    def reset_fc_stl10(self):
+        print 'Resetting fc_stl10 to random'
+        self.sess.run(self.reset_fc_stl10_op)
 
     def get_conv_weights(self, kernel_size, num_input_channels, kernels_num,
                          weight_std=0.01, bias_init_value=0.1):
