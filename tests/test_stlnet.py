@@ -32,6 +32,7 @@ if __name__ == '__main__':
     params = {
         'device_id': '/gpu:0',
         'im_shape': (96, 96, 3),
+        'num_classes': 100,
         'gpu_memory_fraction': None,
         'random_init_type': tfext.stlnet.Stlnet.RandomInitType.XAVIER_GAUSSIAN
     }
@@ -40,7 +41,7 @@ if __name__ == '__main__':
 
     with net.graph.as_default():
         cross_entropy = tf.reduce_mean(
-            tf.nn.sparse_softmax_cross_entropy_with_logits(net.fc13, net.y_gt))
+            tf.nn.sparse_softmax_cross_entropy_with_logits(net.fc12, net.y_gt))
         update_ops = net.graph.get_collection(tf.GraphKeys.UPDATE_OPS)
         assert len(update_ops) > 0
         with tf.control_dependencies(update_ops):
@@ -81,10 +82,10 @@ if __name__ == '__main__':
         print "step {}, training accuracy {:.2f}: {}".format(global_iter, train_accuracy, probs[:, 0])
         print "step {}, test accuracy     {:.2f}: {}".format(global_iter, test_accuracy, test_probs[:, 0])
         if i % 600 == 0:
-            net.reset_fc13()
+            net.reset_last_layer()
 
     saver = tf.train.Saver()
     checkpoint_prefix = os.path.expanduser('~/tmp/tmp-checkpoint-tensorflow-test')
     saver.save(net.sess, checkpoint_prefix, global_step=1, write_meta_graph=False)
-    net.restore_from_snapshot(checkpoint_prefix + '-1', 13)
-    net.reset_fc13()
+    net.restore_from_snapshot(checkpoint_prefix + '-1', 12)
+    net.reset_last_layer()

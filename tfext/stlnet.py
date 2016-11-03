@@ -20,8 +20,9 @@ class Stlnet(object):
 
     def __init__(self,
                  im_shape=(96, 96, 3),
+                 num_classes=1,
                  device_id='/gpu:0',
-                 random_init_type=RandomInitType.GAUSSIAN,
+                 random_init_type=RandomInitType.XAVIER_GAUSSIAN,
                  gpu_memory_fraction=None):
         """
          Args:
@@ -111,25 +112,18 @@ class Stlnet(object):
                                     name='conv11')
             dropout11 = tf.nn.dropout(conv11, self.dropout_keep_prob, name='dropout11')
 
-            self.fc12, self.fc12_relu = self.fc_relu(dropout11,
-                                                     num_outputs=512,
-                                                     relu=True,
-                                                     weight_std=0.005, bias_init_value=0.1,
-                                                     name='fc12')
-            dropout12 = tf.nn.dropout(self.fc12_relu, self.dropout_keep_prob, name='dropout12')
-
-            self.fc13 = self.fc_relu(dropout12,
-                                     num_outputs=10,
+            self.fc12 = self.fc_relu(dropout11,
+                                     num_outputs=num_classes,
                                      relu=False,
                                      weight_std=0.01, bias_init_value=0.0,
-                                     name='fc13')[0]
+                                     name='fc12')[0]
 
             with tf.variable_scope('output'):
-                self.prob = tf.nn.softmax(self.fc13, name='prob')
+                self.prob = tf.nn.softmax(self.fc12, name='prob')
 
-            fc13_w = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "fc13/weight:0")[0]
-            fc13_b = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "fc13/bias:0")[0]
-            self.reset_fc13_op = tf.initialize_variables([fc13_w, fc13_b], name='reset_fc13')
+            fc12_w = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "fc12/weight:0")[0]
+            fc12_b = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "fc12/bias:0")[0]
+            self.reset_fc12_op = tf.initialize_variables([fc12_w, fc12_b], name='reset_fc12')
 
         self.graph = tf.get_default_graph()
         config = tf.ConfigProto(log_device_placement=False,
@@ -152,18 +146,18 @@ class Stlnet(object):
                  will overwrite all variables and set them to initial state.
                  Call restore_from_snapshot() only after sess.run(tf.initialize_all_variables())!
         """
-        if num_layers > 13 or num_layers < 12:
-            raise ValueError('You can restore only 12 or 13 layers.')
+        if num_layers > 12 or num_layers < 11:
+            raise ValueError('You can restore only 11 or 12 layers.')
         if num_layers == 0:
             return
         saver = tf.train.Saver()
         saver.restore(self.sess, snapshot_path)
-        if num_layers == 12:
-            self.reset_fc13()
+        if num_layers == 11:
+            self.reset_last_layer()
 
-    def reset_fc13(self):
-        print 'Resetting fc13 to random'
-        self.sess.run(self.reset_fc13_op)
+    def reset_last_layer(self):
+        print 'Resetting fc12 to random'
+        self.sess.run(self.reset_fc12_op)
 
     def get_conv_weights(self, kernel_size, num_input_channels, kernels_num,
                          weight_std=0.01, bias_init_value=0.1):
@@ -220,13 +214,13 @@ class Stlnet(object):
                                lambda: tflayers.batch_norm(conv,
                                                            decay=self.batch_norm_decay,
                                                            is_training=True,
-                                                           trainable=False,
+                                                           trainable=True,
                                                            reuse=None,
                                                            scope=scope),
                                lambda: tflayers.batch_norm(conv,
                                                            decay=self.batch_norm_decay,
                                                            is_training=False,
-                                                           trainable=False,
+                                                           trainable=True,
                                                            reuse=True,
                                                            scope=scope))
             conv = tf.nn.relu(conv, name=name)
