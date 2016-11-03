@@ -113,3 +113,7 @@ class BatchManager(object):
             'input/is_phase_train:0': is_phase_train
         }
         return feed_dict
+
+    def cleanup(self):
+        for batch_laoder in self.batch_loaders():
+            batch_laoder.cleanup_workers()

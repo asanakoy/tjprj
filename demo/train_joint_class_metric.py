@@ -170,10 +170,6 @@ def run_training(**params):
     for clustering_round in range(0, 4):
 
 
-        # Delete old batch_ldr, recompute clustering and create new batch_ldr
-        del params['batch_ldr']
-        gc.collect()
-
         # Use HOGLDA for initial estimate of similarities
         if clustering_round == 0:
             matrices = trainhelper.get_step_similarities(0, None, params['category'], params['dataset'], None,
@@ -191,6 +187,12 @@ def run_training(**params):
         params['indexfile_path'] = batch_ldr_dict_params
         params['num_classes'] = batch_ldr_dict_params['labels'].max() + 1
         params['batch_ldr'] = batch_loader_with_prefetch.BatchLoaderWithPrefetch(params)
+
+        # Clean up batch loader
+        assert 'batch_ldr' in params, 'batch_ldr myst be in params'
+        params['batch_ldr'].cleanup_workers()
+        del params['batch_ldr']
+        gc.collect()
 
         # Create network with new clustering parameters and return it in network_params dict
         network_params = setup_network(**params)

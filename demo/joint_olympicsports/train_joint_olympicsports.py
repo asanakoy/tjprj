@@ -160,9 +160,6 @@ def run_training(**params):
     assert os.path.exists(params['mean_filepath'])
 
     for clustering_round in range(0, params['num_clustering_rounds']):
-        if 'batch_ldr' in params:
-            del params['batch_ldr']
-            gc.collect()
 
         num_classes = 0
         batch_loaders = dict()
@@ -205,6 +202,8 @@ def run_training(**params):
                                         saver, **params)
         saver.save(net.sess, checkpoint_prefix,
                              global_step=clustering_round + 1)
+        batch_manager.cleanup()
+        gc.collect()
 
     if net is not None:
         net.sess.close()
