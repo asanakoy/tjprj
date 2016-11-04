@@ -51,7 +51,7 @@ def get_first_model_path():
     return '/export/home/asanakoy/workspace/tfprj/data/bvlc_alexnet.npy'
 
 
-def setup_network(num_classes, **params):
+def setup_network(num_classes, snapshot_path_to_restore=None, **params):
     net = tfext.alexnet.Alexnet(num_classes=num_classes, **params)
     logits = net.fc8
     loss_op = network_spec.loss(logits, net.y_gt)
@@ -69,6 +69,10 @@ def setup_network(num_classes, **params):
     summary_op = tf.scalar_summary(['loss', 'batch_accuracy'], [loss_op, accuracy])
 
     net.sess.run(tf.initialize_all_variables())
+    if snapshot_path_to_restore is not None:
+        print('Restoring 7 layers from snapshot {}'.format(snapshot_path_to_restore))
+        net.restore_from_snapshot(snapshot_path_to_restore, 7, restore_iter_counter=True)
+
     return net, train_op, loss_op, saver, summary_writer, summary_op
 
 
@@ -114,7 +118,7 @@ def run_training_current_clustering(net, batch_manager, train_op, loss_op, summa
             summary_writer.flush()
         duration = time.time() - start_time
 
-        if step % params['snapshot_iter'] == 0:
+        if step % params['snapshot_iter'] == 0 and step > 1:
             # TODO: write the number of round in the name
             checkpoint_prefix = os.path.join(params['output_dir'], 'checkpoint')
             saver.save(net.sess, checkpoint_prefix, global_step=global_step)
@@ -191,7 +195,14 @@ def run_training(**params):
         if net is not None:
             net.sess.close()
         tf.reset_default_graph()
-        net, train_op, loss_op, saver, summary_writer, summary_op = setup_network(num_classes, **params)
+        if clustering_round == 0:
+            snapshot_path_to_restore = params.pop('snapshot_path_to_restore')
+        else:
+            snapshot_path_to_restore = None
+            assert 'snapshot_path_to_restore' not in params
+        net, train_op, loss_op, saver, summary_writer, summary_op = setup_network(num_classes,
+                                                                                  snapshot_path_to_restore=snapshot_path_to_restore,
+                                                                                  **params)
         # Restore from previous round model
         if clustering_round > 0:
             checkpoint_path = checkpoint_prefix + '-' + str(clustering_round)
@@ -233,6 +244,7 @@ def main(argv):
         'seed': 1988,
         'output_dir': output_dir,
         'init_model': get_first_model_path(),
+        'snapshot_path_to_restore': '/export/home/asanakoy/workspace/OlympicSports/cnn/joint_categories_0.1conv_anchors/checkpoint-60001',
         'device_id': '/gpu:{}'.format(0),
         'shuffle_every_epoch': True,
         'online_augmentations': False,
