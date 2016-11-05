@@ -12,6 +12,9 @@ import os
 from tqdm import tqdm
 
 
+def get_alexnet_snapshot_path():
+    return '/export/home/asanakoy/workspace/tfprj/data/bvlc_alexnet.tf'
+
 def get_sim(net, category, layer_names, **args):
     """
     Calculate simMatrix and simMatrix_flip from existing net for specified
