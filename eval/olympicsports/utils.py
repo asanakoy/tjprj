@@ -4,6 +4,7 @@ import os
 from tqdm import tqdm
 import PIL
 import PIL.Image
+from os.path import join
 
 def get_num_classes(indices_path):
     mat_data = h5py.File(indices_path, 'r')
@@ -61,3 +62,35 @@ def get_joint_categories_mean(output_path, image_shape=(227, 227)):
 
     np.save(output_path, mean_img)
     return mean_img
+
+
+def get_sim_pathes(model_name, iteration=0, round_id=0, **params):
+    mean_str = '_nomean' if params['mean'] is None else ''
+
+    if model_name == 'alexnet':
+        iteration = 0
+        round_id = None
+
+    if round_id is None:
+        init_model_path = join('/export/home/asanakoy/workspace/OlympicSports/cnn/',
+                               model_name,
+                               params['category'], 'checkpoint-{}'.format(iteration))
+
+        sim_output_path = join('/export/home/asanakoy/workspace/OlympicSports/sim/tf/',
+                               params['category'], 'simMatrix_{}_{}{}_iter_{}_{}_{}.mat'.
+                               format(params['category'], model_name, mean_str, iteration,
+                                      ''.join(params['layer_names']), params['norm_method']))
+    else:
+        init_model_path = join('/export/home/asanakoy/workspace/OlympicSports/cnn/',
+                               model_name,
+                               params['category'], 'checkpoint_r-{}'.format(round_id))
+
+        sim_output_path = join('/export/home/asanakoy/workspace/OlympicSports/sim/tf/',
+                               params['category'], 'simMatrix_{}_{}{}_rounds_{}_{}_{}.mat'.
+                               format(params['category'], model_name, mean_str, round_id,
+                                      ''.join(params['layer_names']), params['norm_method']))
+
+    if model_name == 'alexnet':
+        init_model_path = '/export/home/asanakoy/workspace/tfprj/data/bvlc_alexnet.tf'
+
+    return init_model_path, sim_output_path
