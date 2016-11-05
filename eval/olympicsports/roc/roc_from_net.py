@@ -24,9 +24,14 @@ def compute_roc_auc_from_net(net, category, layer_names,
     """Calculate ROC AUC on the current iteration of the net
     Args:
       net: network
+      layer_names - list of layers. We will test on each of them separately
       load_all_in_memory: load all images from the category in memory
-    Return: ROC AUC for the category
+    Return: dict d of ROC AUC for the category.
+            For example: d['fc7'] will contain ROC AUC computed on fc7 features
     """
+    if not isinstance(layer_names, (list, tuple)):
+        raise ValueError('layer_names must be list or tuple of names')
+
     if mat_path is None:
         mat_path = '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/OlympicSports/crops/' + category + '/images_test.mat'
     if mean_path is None:
@@ -58,32 +63,40 @@ def compute_roc_auc_from_net(net, category, layer_names,
         'image_getter': eval.image_getter.ImageGetterFromMat(mat_path, load_all_in_memory=load_all_in_memory)
     }
 
-    feats = dict()
-    feats['features'] = eval.features.extract_features(False, net=net, frame_ids=used_frame_ids, **feats_params)
-    feats['features_flipped'] = eval.features.extract_features(True, net=net, frame_ids=used_frame_ids, **feats_params)
-    stacked_features = dict()
-    for key, val in feats.iteritems():
-        stacked_features[key] = np.hstack(val.values())
-        if norm_method == 'zscores':
-            stacked_features[key] = stat.zscore(stacked_features[key], axis=0)
-        elif norm_method == 'unit_norm':
-            # in-place
-            sklearn.preprocessing.normalize(stacked_features[key], norm='l2', axis=1,
-                                            copy=False)
-    feats = stacked_features
+    layer_feats = dict()
+
+    all_features = eval.features.extract_features(False, net=net, frame_ids=used_frame_ids, **feats_params)
+    for layer_name, f in all_features.iteritems():
+        layer_feats[layer_name] = dict()
+        layer_feats[layer_name]['features'] = f
+
+    all_features_flipped = eval.features.extract_features(True, net=net, frame_ids=used_frame_ids, **feats_params)
+    for layer_name, f in all_features_flipped.iteritems():
+        layer_feats[layer_name]['features_flipped'] = f
+
+    for layer_name in layer_feats.keys():
+        for key in layer_feats[layer_name].keys():
+            if norm_method == 'zscores':
+                layer_feats[layer_name][key] = stat.zscore(layer_feats[layer_name][key], axis=0)
+            elif norm_method == 'unit_norm':
+                # in-place
+                sklearn.preprocessing.normalize(layer_feats[layer_name][key], norm='l2', axis=1, copy=False)
 
     # Calculating ROC AUC
-    false_pos_rate_list = list()
-    true_pos_rate_list = list()
-    for i, anchor_id in enumerate(labels_dict['anchors']):
-        scores = [__get_similarity_score(feats, pos_lookup[anchor_id], pos_lookup[frame_id], flipval) for
-                  frame_id, flipval in
-                  zip(labels_dict['ids'][i], labels_dict['flipvals'][i].astype(int))]
+    roc_auc_dict = dict()
+    for layer_name, cur_feats in layer_feats.iteritems():
+        false_pos_rate_list = list()
+        true_pos_rate_list = list()
+        for i, anchor_id in enumerate(labels_dict['anchors']):
+            scores = [__get_similarity_score(cur_feats, pos_lookup[anchor_id], pos_lookup[frame_id], flipval) for
+                      frame_id, flipval in
+                      zip(labels_dict['ids'][i], labels_dict['flipvals'][i].astype(int))]
 
-        assert len(scores) == len(labels_dict['ids'][i])
-        roc_auc, fpr, tpr = get_roc_auc(labels_dict['labels'][i], scores, pos_class=1)
-        false_pos_rate_list.append(fpr)
-        true_pos_rate_list.append(tpr)
-    roc_auc = compute_interpolated_roc_auc(labels_dict, false_pos_rate_list,
-                                           true_pos_rate_list)
-    return roc_auc
+            assert len(scores) == len(labels_dict['ids'][i])
+            roc_auc, fpr, tpr = get_roc_auc(labels_dict['labels'][i], scores, pos_class=1)
+            false_pos_rate_list.append(fpr)
+            true_pos_rate_list.append(tpr)
+        roc_auc = compute_interpolated_roc_auc(labels_dict, false_pos_rate_list,
+                                               true_pos_rate_list)
+        roc_auc_dict[layer_name] = roc_auc
+    return roc_auc_dict

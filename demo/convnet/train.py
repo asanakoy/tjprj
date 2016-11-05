@@ -89,21 +89,22 @@ def setup_network(**params):
 
 
 def eval_net(net, summary_writer, params, global_step=None):
-    # TODO: input list of feature names an fet output dict!!!
     if global_step is None:
         global_step = net.sess.run(net.global_iter_counter)
-    roc_auc = eval.olympicsports.roc. \
+    roc_auc_dict = eval.olympicsports.roc. \
         roc_from_net.compute_roc_auc_from_net(net,
                                               params['category'],
-                                              ['maxpool5'],
+                                              ['maxpool5', 'fc6'],
                                               mat_path=params['images_mat_filepath'],
                                               mean_path=params['mean_filepath'],
                                               batch_size=256,
                                               norm_method=None)
-    summary_writer.add_summary(tfext.utils.create_sumamry('ROCAUC', roc_auc),
-                                         global_step=global_step)
+    for layer_name, auc in roc_auc_dict.iteritems():
+        summary_writer.add_summary(tfext.utils.create_sumamry('{}ROCAUC_{}'.format(layer_name,
+                                                                                   params['category']), auc),
+                                                                                   global_step=global_step)
     summary_writer.flush()
-    return roc_auc
+    return roc_auc_dict
 
 
 def run_training_current_clustering(**params):
@@ -128,7 +129,7 @@ def run_training_current_clustering(**params):
 
         if step == 0 or step == params['fix_conv_iter']:
             roc_auc = eval_net(net, summary_writer, params)
-            print('Step %d: ROCAUC = %.2f' % (step, roc_auc))
+            print('Step {}: ROCAUC = {}'.format(step, roc_auc))
 
         if step % summary_step == 0:
             global_step, summary_str, _, loss_value = params['net'].sess.run([net.global_iter_counter,
@@ -144,7 +145,7 @@ def run_training_current_clustering(**params):
 
         if step > params['fix_conv_iter'] and (step % params['test_step'] == 0 or step + 1 == params['max_iter']):
             roc_auc = eval_net(net, summary_writer, params, global_step=global_step)
-            print('Step %d: ROCAUC = %.2f' % (step, roc_auc))
+            print('Step {}: ROCAUC = {}'.format(step, roc_auc))
 
         if step % params['snapshot_iter'] == 0 and step > 1:
             # TODO: write the number of round in the name
