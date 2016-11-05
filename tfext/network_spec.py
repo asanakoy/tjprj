@@ -165,7 +165,7 @@ def training(net, loss, base_lr=None, fc_lr_mult=1.0, conv_lr_mult=1.0, **params
     return tf.group(conv_tran_op, fc_tran_op)
 
 
-def training_convnet(net, loss, fc_lr, conv_lr):
+def training_convnet(net, loss_op, fc_lr, conv_lr):
 
     conv_optimizer = tf.train.AdagradOptimizer(conv_lr,
                                                initial_accumulator_value=0.0001)
@@ -177,13 +177,11 @@ def training_convnet(net, loss, fc_lr, conv_lr):
     conv_vars = net.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'conv')
     fc_vars = net.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'fc')
 
-    grads = tf.gradients(loss, conv_vars + fc_vars)
+    grads = tf.gradients(loss_op, conv_vars + fc_vars)
     conv_grads = grads[:len(conv_vars)]
     fc_grads = grads[len(conv_vars):]
     assert len(conv_grads) + len(fc_grads) == len(conv_vars) + len(fc_vars)
-
     update_ops = net.graph.get_collection(tf.GraphKeys.UPDATE_OPS)
-    assert len(update_ops) > 0
     with tf.control_dependencies(update_ops):
         conv_tran_op = conv_optimizer.apply_gradients(zip(conv_grads, conv_vars))
         fc_tran_op = fc_optimizer.apply_gradients(zip(fc_grads, fc_vars),
