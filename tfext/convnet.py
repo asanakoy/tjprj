@@ -239,18 +239,18 @@ class Convnet(object):
                                                            trainable=True,
                                                            reuse=True,
                                                            scope=scope))
-            conv = tf.nn.relu(conv, name=scope)
+            conv = tf.nn.relu(conv, name=name)
         return conv
 
     def fc_relu(self, input_tensor, num_outputs, relu=False, weight_std=0.005,
                 bias_init_value=0.1, name=None):
-        with tf.variable_scope(name) as name:
+        with tf.variable_scope(name):
             num_inputs = int(np.prod(input_tensor.get_shape()[1:]))
             w, b = self.get_fc_weights(num_inputs, num_outputs,
                                        weight_std=weight_std,
                                        bias_init_value=bias_init_value)
-            fc_relu = None
 
+            fc_relu = None
             input_tensor_reshaped = tf.reshape(input_tensor, [-1, num_inputs])
             if relu:
                 fc = tf.add(tf.matmul(input_tensor_reshaped, w), b, name='fc')
