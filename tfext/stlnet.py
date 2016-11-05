@@ -26,9 +26,7 @@ class Stlnet(object):
                  gpu_memory_fraction=None):
         """
          Args:
-          init_model: dict containing network weights, or a string with path to .np file with the dict,
-            if is None then init using random weights and biases
-          num_classes: number of output classes
+          num_classes: number of cliaues
           gpu_memory_fraction: Fraction on the max GPU memory to allocate for process needs.
             Allow auto growth if None (can take up to the totality of the memory).
         :return:
@@ -90,51 +88,52 @@ class Stlnet(object):
             conv8 = self.conv_relu(conv7, kernel_size=1,
                                    kernels_num=192, stride=1,
                                    name='conv8')
-            conv9 = self.conv_relu(conv8, kernel_size=1,
+            self.conv9 = self.conv_relu(conv8, kernel_size=1,
                                    kernels_num=192, stride=1,
                                    name='conv9')
 
-            conv10 = self.conv_relu(conv9, kernel_size=3,
+            # For finetunign on labeled part of STL-10
+            conv10 = self.conv_relu(self.conv9, kernel_size=3,
                                     kernels_num=256, stride=1,
                                     batch_norm=False,
                                     name='conv10')
-
             maxpool10 = tf.nn.max_pool(conv10,
                                        ksize=[1, 3, 3, 1],
                                        strides=[1, 2, 2, 1],
                                        padding='VALID',
                                        name='maxpool10')
             dropout10 = tf.nn.dropout(maxpool10, self.dropout_keep_prob, name='dropout10')
-
             conv11 = self.conv_relu(dropout10, kernel_size=3,
                                     kernels_num=128, stride=1,
                                     batch_norm=False,
                                     name='conv11')
             dropout11 = tf.nn.dropout(conv11, self.dropout_keep_prob, name='dropout11')
-
-            self.fc12 = self.fc_relu(dropout11,
-                                     num_outputs=num_classes,
-                                     relu=False,
-                                     weight_std=0.01, bias_init_value=0.0,
-                                     name='fc12')[0]
-
             self.fc_stl10 = self.fc_relu(dropout11,
                                      num_outputs=10,
                                      relu=False,
                                      weight_std=0.01, bias_init_value=0.0,
                                      name='fc_stl10')[0]
 
+            # For training cliques
+            dropout_cliques = tf.nn.dropout(self.conv9, self.dropout_keep_prob,
+                                            name='dropout_cliques')
+            self.fc_cliques = self.fc_relu(dropout_cliques,
+                                           num_outputs=num_classes,
+                                           relu=False,
+                                           weight_std=0.01, bias_init_value=0.0,
+                                           name='fc_cliques')[0]
             with tf.variable_scope('output'):
-                self.prob = tf.nn.softmax(self.fc12, name='prob')
+                self.prob_cliques = tf.nn.softmax(self.fc_cliques, name='prob_cliques')
                 self.prob_stl10 = tf.nn.softmax(self.fc_stl10, name='prob_stl10')
 
-            fc12_w = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "fc12/weight:0")[0]
-            fc12_b = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "fc12/bias:0")[0]
-            self.reset_fc12_op = tf.initialize_variables([fc12_w, fc12_b], name='reset_fc12')
+            fc_cliques_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "fc_cliques")
+            self.reset_fc_cliqeus_op = tf.initialize_variables(fc_cliques_vars, name='reset_fc_cliques')
 
-            fc12_w = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "fc_stl10/weight:0")[0]
-            fc12_b = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "fc_stl10/bias:0")[0]
-            self.reset_fc_stl10_op = tf.initialize_variables([fc12_w, fc12_b], name='reset_fc_stl10')
+            stl_10_vars = list()
+            map(lambda vrs: stl_10_vars.extend(vrs),
+                [tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, names)
+                 for names in ['conv10', 'conv11', 'fc_stl10']])
+            self.reset_fc_stl10_op = tf.initialize_variables(stl_10_vars, name='reset_fc_stl10')
 
         self.graph = tf.get_default_graph()
         config = tf.ConfigProto(log_device_placement=False,
@@ -157,21 +156,18 @@ class Stlnet(object):
                  will overwrite all variables and set them to initial state.
                  Call restore_from_snapshot() only after sess.run(tf.initialize_all_variables())!
         """
-        if num_layers > 12 or num_layers < 11:
-            raise ValueError('You can restore only 11 or 12 layers.')
+        if num_layers != 12:
+            raise ValueError('You can restore only all 12 layers + cliques_fc')
         if num_layers == 0:
             return
         saver = tf.train.Saver()
         saver.restore(self.sess, snapshot_path)
-        if num_layers == 11:
-            self.reset_fc12()
-            self.reset_fc_stl10()
 
-    def reset_fc12(self):
-        print 'Resetting fc12 to random'
-        self.sess.run(self.reset_fc12_op)
+    def reset_fc_cliques(self):
+        print 'Resetting fc_cliques to random'
+        self.sess.run(self.reset_fc_cliqeus_op)
 
-    def reset_fc_stl10(self):
+    def reset_stl10(self):
         print 'Resetting fc_stl10 to random'
         self.sess.run(self.reset_fc_stl10_op)
 
@@ -239,6 +235,7 @@ class Stlnet(object):
                                                            trainable=True,
                                                            reuse=True,
                                                            scope=scope))
+
             conv = tf.nn.relu(conv, name=name)
         return conv
 
@@ -249,8 +246,8 @@ class Stlnet(object):
             w, b = self.get_fc_weights(num_inputs, num_outputs,
                                        weight_std=weight_std,
                                        bias_init_value=bias_init_value)
-            fc_relu = None
 
+            fc_relu = None
             input_tensor_reshaped = tf.reshape(input_tensor, [-1, num_inputs])
             if relu:
                 fc = tf.add(tf.matmul(input_tensor_reshaped, w), b, name='fc')

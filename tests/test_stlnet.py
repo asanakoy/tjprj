@@ -22,7 +22,7 @@ def test_feed_forward(net, im_shape):
     batch = batch[:, :, :, ::-1]  # MAKE BGR!
 
     t = time.time()
-    output = net.sess.run(net.prob, feed_dict={'input/x:0': batch, 'input/is_phase_train:0': False})
+    output = net.sess.run(net.prob_cliques, feed_dict={'input/x:0': batch, 'input/is_phase_train:0': False})
     for input_im_ind in range(output.shape[0]):
         print 'Image {}:  {}'.format(input_im_ind, output[input_im_ind])
     print time.time() - t
@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
     with net.graph.as_default():
         cross_entropy = tf.reduce_mean(
-            tf.nn.sparse_softmax_cross_entropy_with_logits(net.fc12, net.y_gt))
+            tf.nn.sparse_softmax_cross_entropy_with_logits(net.fc_cliques, net.y_gt))
         update_ops = net.graph.get_collection(tf.GraphKeys.UPDATE_OPS)
         assert len(update_ops) > 0
         with tf.control_dependencies(update_ops):
@@ -49,7 +49,7 @@ if __name__ == '__main__':
                                                    initial_accumulator_value=0.00001).minimize(cross_entropy, global_step=net.global_iter_counter)
             # train_step = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(cross_entropy,
             #                                                                      global_step=net.global_iter_counter)
-        correct_prediction = tf.equal(tf.cast(tf.argmax(net.prob, 1), tf.int32), net.y_gt)
+        correct_prediction = tf.equal(tf.cast(tf.argmax(net.prob_cliques, 1), tf.int32), net.y_gt)
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
     net.sess.run(tf.initialize_all_variables())
@@ -64,16 +64,16 @@ if __name__ == '__main__':
         batch[i, ...] = im
     batch = batch[:, :, :, ::-1]
 
-    for i in range(750):
+    for i in range(890):
         # batch = np.random.random((5, 96, 96, 3))
         y = [0, 1, 5, 9, 3]
 
-        probs, train_accuracy, _, global_iter = net.sess.run([net.prob, accuracy, train_step, net.global_iter_counter],
+        probs, train_accuracy, _, global_iter = net.sess.run([net.prob_cliques, accuracy, train_step, net.global_iter_counter],
                                                               feed_dict={net.x: batch,
                                                                          net.y_gt: y,
                                                                          net.dropout_keep_prob: 0.5,
                                                                          net.is_phase_train: True})
-        test_probs, test_accuracy, global_iter = net.sess.run([net.prob, accuracy, net.global_iter_counter],
+        test_probs, test_accuracy, global_iter = net.sess.run([net.prob_cliques, accuracy, net.global_iter_counter],
                                                    feed_dict={net.x: batch,
                                                    net.y_gt: y,
                                                    net.dropout_keep_prob: 1.0,
@@ -82,11 +82,11 @@ if __name__ == '__main__':
         print "step {}, training accuracy {:.2f}: {}".format(global_iter, train_accuracy, probs[:, 0])
         print "step {}, test accuracy     {:.2f}: {}".format(global_iter, test_accuracy, test_probs[:, 0])
         if i % 600 == 0:
-            net.reset_fc12()
+            net.reset_fc_cliques()
 
     saver = tf.train.Saver()
     checkpoint_prefix = os.path.expanduser('~/tmp/tmp-checkpoint-tensorflow-test')
     saver.save(net.sess, checkpoint_prefix, global_step=1, write_meta_graph=False)
     net.restore_from_snapshot(checkpoint_prefix + '-1', 12)
-    net.reset_fc12()
-    net.reset_fc_stl10()
+    net.reset_fc_cliques()
+    net.reset_stl10()
