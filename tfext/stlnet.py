@@ -160,8 +160,9 @@ class Stlnet(object):
             raise ValueError('You can restore only all 12 layers + cliques_fc')
         if num_layers == 0:
             return
-        saver = tf.train.Saver()
-        saver.restore(self.sess, snapshot_path)
+        with self.graph.as_default():
+            saver = tf.train.Saver()
+            saver.restore(self.sess, snapshot_path)
 
     def reset_fc_cliques(self):
         print 'Resetting fc_cliques to random'

@@ -130,11 +130,11 @@ class Convnet(object):
             raise ValueError('You can restore only 5 or 6 layers.')
         if num_layers == 0:
             return
-        # TODO: create saver inside a graph
-        saver = tf.train.Saver()
-        saver.restore(self.sess, snapshot_path)
-        if num_layers == 5:
-            self.reset_fc6()
+        with self.graph.as_default():
+            saver = tf.train.Saver()
+            saver.restore(self.sess, snapshot_path)
+            if num_layers == 5:
+                self.reset_fc6()
 
     def restore_from_alexnet_snapshot(self, snapshot_path, num_layers):
         """
@@ -155,9 +155,10 @@ class Convnet(object):
 
         var_names_to_restore = ['conv{}/bias:0'.format(i) for i in xrange(1, min(6, num_layers + 1))] + \
                                ['conv{}/weight:0'.format(i) for i in xrange(1, min(6, num_layers + 1))]
-        vars_to_restore = [self.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, var_name)[0] for var_name in var_names_to_restore]
-        saver = tf.train.Saver(vars_to_restore)
-        saver.restore(self.sess, snapshot_path)
+        with self.graph.as_default():
+            vars_to_restore = [self.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, var_name)[0] for var_name in var_names_to_restore]
+            saver = tf.train.Saver(vars_to_restore)
+            saver.restore(self.sess, snapshot_path)
 
     def reset_fc6(self):
         print 'Resetting fc6 to random'

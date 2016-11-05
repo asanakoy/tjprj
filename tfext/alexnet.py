@@ -333,8 +333,9 @@ class Alexnet(object):
         print 'Restoring {} from the snapshot'.format(vars_names_to_restore)
         if restore_iter_counter:
             vars_to_restore += [self.global_iter_counter]
-        saver = tf.train.Saver(var_list=vars_to_restore)
-        saver.restore(self.sess, snapshot_path)
+        with self.graph.as_default():
+            saver = tf.train.Saver(var_list=vars_to_restore)
+            saver.restore(self.sess, snapshot_path)
 
     def get_conv_weights(self, layer_index, net_data, kernel_height, kernel_width,
                          num_input_channels, kernels_num):
