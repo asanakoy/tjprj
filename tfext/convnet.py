@@ -104,6 +104,8 @@ class Convnet(object):
             self.reset_fc6_op = tf.initialize_variables([fc6_w, fc6_b], name='reset_fc6')
 
         self.graph = tf.get_default_graph()
+        assert len(self.graph.get_collection(tf.GraphKeys.UPDATE_OPS)) > 0, 'Must contain batch normalization update ops!'
+
         config = tf.ConfigProto(log_device_placement=False,
                                 allow_soft_placement=True)
         # please do not use the totality of the GPU memory.
@@ -149,6 +151,7 @@ class Convnet(object):
             raise ValueError('You can restore from 0 to 5 layers.')
         if num_layers == 0:
             return
+        print 'Restoring {} layers from Alexnet model'.format(num_layers)
 
         var_names_to_restore = ['conv{}/bias:0'.format(i) for i in xrange(1, min(6, num_layers + 1))] + \
                                ['conv{}/weight:0'.format(i) for i in xrange(1, min(6, num_layers + 1))]

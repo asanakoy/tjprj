@@ -296,9 +296,11 @@ class Alexnet(object):
                 assert self.fc8.get_shape()[1] == self.num_classes, \
                     '{} != {}'.format(self.fc8.get_shape()[1], self.num_classes)
 
+            self.logits = self.fc8
             with tf.variable_scope('output'):
                 self.prob = tf.nn.softmax(self.fc8, name='prob')
 
+        self.graph = tf.get_default_graph()
         self.trainable_vars = tr_vars
         config = tf.ConfigProto(log_device_placement=False,
                                 allow_soft_placement=True)
