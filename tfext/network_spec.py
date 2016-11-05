@@ -123,7 +123,6 @@ def loss_generative_discriminative(x, logits, mu, unique_mu, sigma, y, alpha=1.0
     return tf.add(generative_loss, discriminative_loss)
 
 
-
 def training(net, loss, base_lr=None, fc_lr_mult=1.0, conv_lr_mult=1.0, **params):
     """Sets up the training Ops.
 
@@ -163,6 +162,32 @@ def training(net, loss, base_lr=None, fc_lr_mult=1.0, conv_lr_mult=1.0, **params
     conv_tran_op = conv_optimizer.apply_gradients(zip(conv_grads, conv_vars))
     fc_tran_op = fc_optimizer.apply_gradients(zip(fc_grads, fc_vars),
                                               global_step=net.global_iter_counter)
+    return tf.group(conv_tran_op, fc_tran_op)
+
+
+def training_convnet(net, loss, fc_lr, conv_lr):
+
+    conv_optimizer = tf.train.AdagradOptimizer(conv_lr,
+                                               initial_accumulator_value=0.0001)
+    fc_optimizer = tf.train.AdagradOptimizer(fc_lr,
+                                             initial_accumulator_value=0.0001)
+
+    print('Conv LR: {}, FC LR: {}'.format(conv_lr, fc_lr))
+
+    conv_vars = net.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'conv')
+    fc_vars = net.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'fc')
+
+    grads = tf.gradients(loss, conv_vars + fc_vars)
+    conv_grads = grads[:len(conv_vars)]
+    fc_grads = grads[len(conv_vars):]
+    assert len(conv_grads) + len(fc_grads) == len(conv_vars) + len(fc_vars)
+
+    update_ops = net.graph.get_collection(tf.GraphKeys.UPDATE_OPS)
+    assert len(update_ops) > 0
+    with tf.control_dependencies(update_ops):
+        conv_tran_op = conv_optimizer.apply_gradients(zip(conv_grads, conv_vars))
+        fc_tran_op = fc_optimizer.apply_gradients(zip(fc_grads, fc_vars),
+                                                  global_step=net.global_iter_counter)
     return tf.group(conv_tran_op, fc_tran_op)
 
 
