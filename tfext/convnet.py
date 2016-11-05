@@ -131,10 +131,15 @@ class Convnet(object):
         if num_layers == 0:
             return
         with self.graph.as_default():
-            saver = tf.train.Saver()
-            saver.restore(self.sess, snapshot_path)
             if num_layers == 5:
                 self.reset_fc6()
+                fc6_vars = tf.get_collection(tf.GraphKeys.VARIABLES, "fc6")
+                vars_to_restore = tf.get_collection(tf.GraphKeys.VARIABLES)
+                vars_to_restore = [x for x in vars_to_restore if x not in fc6_vars]
+                saver = tf.train.Saver(vars_to_restore)
+            else:
+                saver = tf.train.Saver()
+            saver.restore(self.sess, snapshot_path)
 
     def restore_from_alexnet_snapshot(self, snapshot_path, num_layers):
         """
