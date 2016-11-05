@@ -1,6 +1,7 @@
 import numpy as np
 import multiprocessing as mp
 import ctypes
+import tfext.alexnet
 
 CATEGORIES = ['basketball_layup',
               'bowling',
@@ -36,7 +37,7 @@ class BatchWorker(mp.Process):
 
 
 class BatchManager(object):
-    def __init__(self, batch_loaders, batch_size, image_shape, random_shuffle=True,
+    def __init__(self, batch_loaders, batch_size, image_shape, network, random_shuffle=True,
                  random_seed=None):
         if len(batch_loaders) != len(CATEGORIES):
             raise ValueError
@@ -46,6 +47,7 @@ class BatchManager(object):
         self.num_categories = len(CATEGORIES)
         self.batch_loaders = batch_loaders
         self.batch_size = batch_size
+        self.network = network
         self._cur_batch_num = 0
         self.random_shuffle = random_shuffle
         self.random_state = np.random.RandomState(random_seed)
@@ -76,7 +78,7 @@ class BatchManager(object):
             self.images = self.images[perm]
             self.labels = self.labels[perm]
 
-    def fill_feed_dict(self, phase='test'):
+    def fill_feed_dict(self, phase):
         """Fills the feed_dict for training the given step.
 
         A feed_dict takes the form of:
@@ -105,15 +107,24 @@ class BatchManager(object):
         labels_feed = self.labels[pos_begin:pos_begin + self.batch_size]
         self._cur_batch_num += 1
 
-        feed_dict = {
-            'input/x:0': images_feed,
-            'input/y_gt:0': labels_feed,
-            'fc6/keep_prob_pl:0': keep_prob,
-            'fc7/keep_prob_pl:0': keep_prob,
-            'input/is_phase_train:0': is_phase_train
-        }
+        if self.network == tfext.alexnet.Alexnet:
+            feed_dict = {
+                'input/x:0': images_feed,
+                'input/y_gt:0': labels_feed,
+                'fc6/keep_prob_pl:0': keep_prob,
+                'fc7/keep_prob_pl:0': keep_prob,
+                'input/is_phase_train:0': is_phase_train
+            }
+        else:
+            feed_dict = {
+                'input/x:0': images_feed,
+                'input/y_gt:0': labels_feed,
+                'input/dropout_keep_prob:0': keep_prob,
+                'input/is_phase_train:0': is_phase_train
+            }
         return feed_dict
 
     def cleanup(self):
-        for batch_laoder in self.batch_loaders():
-            batch_laoder.cleanup_workers()
+        for cat_name, batch_loader in self.batch_loaders.iteritems():
+            batch_loader.cleanup_workers()
+
