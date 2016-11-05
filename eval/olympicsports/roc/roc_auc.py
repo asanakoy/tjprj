@@ -5,7 +5,8 @@ import h5py
 import scipy.interpolate
 import scipy.io
 import sklearn.metrics as sklm
-
+import os
+import glob
 
 POS_LABEL = 1
 
@@ -133,6 +134,7 @@ def compute_roc_auc_from_sim(argv, path_sim_matrix=None, is_quiet=False):
     avg_roc_auc, interp_roc_auc, roc_auc_list = compute_roc(d, sim)
     print '{} n_acnhors: {} mean_ROC_AUC: {:.3f} interp_ROC_AUC: {:.3f}'.format(category, len(
         d['anchors']), avg_roc_auc, interp_roc_auc)
+    return interp_roc_auc
 
 
 def run_all_cat():
@@ -156,9 +158,11 @@ def run_all_cat():
     categories = sorted(categories)
     for cat in categories:
         try:
-            compute_roc_auc_from_sim([cat], is_quiet=True)
+            path_sim_matrix = '/export/home/asanakoy/workspace/OlympicSports/sim/tf/{0}/simMatrix_{0}_aug_less_aggressive__rounds_1_fc7_None'.format(cat)
+            compute_roc_auc_from_sim([cat], path_sim_matrix=path_sim_matrix, is_quiet=True)
         except IOError as e:
-            print e
+            # print e
+            print cat
 
 
 if __name__ == '__main__':
