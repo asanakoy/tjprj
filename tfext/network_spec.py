@@ -123,7 +123,7 @@ def loss_generative_discriminative(x, logits, mu, unique_mu, sigma, y, alpha=1.0
     return tf.add(generative_loss, discriminative_loss)
 
 
-def training(net, loss, base_lr=None, fc_lr_mult=1.0, conv_lr_mult=1.0, **params):
+def training(net, loss_op, base_lr=None, fc_lr_mult=1.0, conv_lr_mult=1.0, **params):
     """Sets up the training Ops.
 
     Creates a summarizer to track the loss over time in TensorBoard.
@@ -134,13 +134,13 @@ def training(net, loss, base_lr=None, fc_lr_mult=1.0, conv_lr_mult=1.0, **params
     `sess.run()` call to cause the model to train.
 
     Args:
-      loss: Loss tensor, from loss().
+      loss_op: Loss tensor, from loss().
       learning_rate: The learning rate to use for gradient descent.
 
     Returns:
       train_op: The Op for training.
     """
-    tf.scalar_summary(loss.op.name, loss)
+    tf.scalar_summary(loss_op.op.name, loss_op)
     # WARNING: initial_accumulator_value in caffe's AdaGrad is probably 0.0
     conv_optimizer = tf.train.AdagradOptimizer(base_lr * conv_lr_mult,
                                                initial_accumulator_value=0.0001)
@@ -154,7 +154,7 @@ def training(net, loss, base_lr=None, fc_lr_mult=1.0, conv_lr_mult=1.0, **params
     conv_vars = [val for (key, val) in net.trainable_vars.iteritems() if key.startswith('conv')]
     fc_vars = [val for (key, val) in net.trainable_vars.iteritems() if key.startswith('fc')]
 
-    grads = tf.gradients(loss, conv_vars + fc_vars)
+    grads = tf.gradients(loss_op, conv_vars + fc_vars)
     conv_grads = grads[:len(conv_vars)]
     fc_grads = grads[len(conv_vars):]
     assert len(conv_grads) + len(fc_grads) == len(net.trainable_vars)
