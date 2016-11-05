@@ -84,51 +84,51 @@ def extract_features(flipped, net=None, frame_ids=None, **params):
     # Default param 8 layers
     params['number_layers_restore'] = params.get('number_layers_restore', 8)
 
-    with tf.Graph().as_default():
-        if net is None:
-            is_temp_session = True
+    if net is None:
+        is_temp_session = True
+        with tf.Graph().as_default():
             if params['number_layers_restore'] == 8 and 'num_classes' not in params:
                 raise ValueError('You must specify "num_classes" if you restore 8 layers')
             net = tfext.alexnet.Alexnet(init_model=None, **params)
             net.sess.run(tf.initialize_all_variables())
             assert os.path.exists(params['snapshot_path'])
             net.restore_from_snapshot(params['snapshot_path'], params['number_layers_restore'])
-        else:
-            is_temp_session = False
+    else:
+        is_temp_session = False
 
-        tensors_to_get = [net.__getattribute__(name) for name in params['layer_names']]
-        print 'Tensors to extract:', tensors_to_get
-        d = dict()
-        if frame_ids is None:
-            frame_ids = np.arange(params['image_getter'].total_num_images())
+    tensors_to_get = [net.__getattribute__(name) for name in params['layer_names']]
+    print 'Tensors to extract:', tensors_to_get
+    d = dict()
+    if frame_ids is None:
+        frame_ids = np.arange(params['image_getter'].total_num_images())
 
-        for layer_name in params['layer_names']:
-            tensor = net.__getattribute__(layer_name)
-            d[layer_name] = np.zeros((len(frame_ids), np.prod(tensor.get_shape()[1:])))
+    for layer_name in params['layer_names']:
+        tensor = net.__getattribute__(layer_name)
+        d[layer_name] = np.zeros((len(frame_ids), np.prod(tensor.get_shape()[1:])))
 
-        num_batches = int(math.ceil(len(frame_ids) / params['batch_size']))
-        print 'Running {} iterations with batch_size={}'.\
-            format(num_batches, params['batch_size'])
-        for step, batch_start in tqdm(enumerate(range(0, len(frame_ids), params['batch_size'])),
-                                      total=num_batches):
-            batch_idxs = frame_ids[batch_start:batch_start + params['batch_size']]
-            batch = params['image_getter'].get_batch(batch_idxs,
-                                                     resize_shape=params['im_shape'],
-                                                     mean=params['mean'])
-            if flipped:
-                batch = batch[:, :, ::-1, :]
+    num_batches = int(math.ceil(len(frame_ids) / params['batch_size']))
+    print 'Running {} iterations with batch_size={}'.\
+        format(num_batches, params['batch_size'])
+    for step, batch_start in tqdm(enumerate(range(0, len(frame_ids), params['batch_size'])),
+                                  total=num_batches):
+        batch_idxs = frame_ids[batch_start:batch_start + params['batch_size']]
+        batch = params['image_getter'].get_batch(batch_idxs,
+                                                 resize_shape=params['im_shape'],
+                                                 mean=params['mean'])
+        if flipped:
+            batch = batch[:, :, ::-1, :]
 
-            feed_dict = {
-                net.x: batch,
-                'input/is_phase_train:0': False
-            }
+        feed_dict = {
+            'input/x:0': batch,
+            'input/is_phase_train:0': False
+        }
 
-            features = net.sess.run(tensors_to_get, feed_dict=feed_dict)
-            pos_begin = params['batch_size'] * step
-            pos_end = pos_begin + len(batch_idxs)
-            for tensor_id, layer_name in enumerate(params['layer_names']):
-                d[layer_name][pos_begin:pos_end, ...] = features[tensor_id].reshape(len(batch_idxs), -1)
+        features = net.sess.run(tensors_to_get, feed_dict=feed_dict)
+        pos_begin = params['batch_size'] * step
+        pos_end = pos_begin + len(batch_idxs)
+        for tensor_id, layer_name in enumerate(params['layer_names']):
+            d[layer_name][pos_begin:pos_end, ...] = features[tensor_id].reshape(len(batch_idxs), -1)
 
-        if is_temp_session:
-            net.sess.close()
-        return d
+    if is_temp_session:
+        net.sess.close()
+    return d
