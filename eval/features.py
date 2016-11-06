@@ -81,12 +81,12 @@ def extract_features(flipped, net=None, frame_ids=None, **params):
     if not isinstance(params['layer_names'], list):
         raise TypeError('layer_names must be a list')
 
-    # Default param 8 layers
-    params['number_layers_restore'] = params.get('number_layers_restore', 8)
-
     if net is None:
+        if 'number_layers_restore' not in params:
+            raise KeyError('number_layers_restore must be in params if net is None')
         is_temp_session = True
         with tf.Graph().as_default():
+            print 'Creating default Alexnet Network with {} learned layers'.format(params['number_layers_restore'])
             if params['number_layers_restore'] == 8 and 'num_classes' not in params:
                 raise ValueError('You must specify "num_classes" if you restore 8 layers')
             net = tfext.alexnet.Alexnet(init_model=None, **params)
