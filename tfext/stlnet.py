@@ -103,11 +103,13 @@ class Stlnet(object):
                                        padding='VALID',
                                        name='maxpool10')
             dropout10 = tf.nn.dropout(maxpool10, self.dropout_keep_prob, name='dropout10')
-            conv11 = self.conv_relu(dropout10, kernel_size=3,
+
+            self.conv11 = self.conv_relu(dropout10, kernel_size=3,
                                     kernels_num=128, stride=1,
                                     batch_norm=False,
                                     name='conv11')
-            dropout11 = tf.nn.dropout(conv11, self.dropout_keep_prob, name='dropout11')
+            dropout11 = tf.nn.dropout(self.conv11, self.dropout_keep_prob, name='dropout11')
+
             self.fc_stl10 = self.fc_relu(dropout11,
                                      num_outputs=10,
                                      relu=False,

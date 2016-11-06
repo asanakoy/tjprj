@@ -68,6 +68,9 @@ def get_step_similarities(step, net, category, dataset, layers, pathtosim=None, 
         if dataset.startswith('Caltech'):
             simMatrix = np.load(pathtosim_avg)
             flipMatrix = np.zeros(simMatrix.shape)
+        elif dataset.startswith('pascal'):
+            simMatrix = np.load(pathtosim_avg)
+            flipMatrix = np.zeros(simMatrix.shape)
         else:
             data = h5py.File(pathtosim, 'r')
             data2 = h5py.File(pathtosim_avg, 'r')
@@ -82,6 +85,15 @@ def get_step_similarities(step, net, category, dataset, layers, pathtosim=None, 
                 '/export/home/mbautist/Desktop/workspace/cnn_similarities/data/mat_files/cliqueCNN/{}_batch_128_10trans_shuffleMB1shuffleALL_0/mat/'.format(dataset)),
             }
             d = get_sim(net, category, layers, return_features=False, **pars)
+
+        if dataset.startswith('pascal'):
+            pars = {
+            'mat_path': '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/VOC/images_CVPR17/images.mat',
+            'data_dir': join(
+                '/export/home/mbautist/Desktop/workspace/cnn_similarities/data/mat_files/cliqueCNN/{}_batch_128_10trans_shuffleMB1shuffleALL_0/mat/'.format(dataset)),
+            }
+            d = get_sim(net, category, layers, return_features=False, **pars)
+
         else:
             # TODO: if we use crops bbox_sq than change the pathes to mat_file and mean here
             d = get_sim(net, category, layers, return_features=False)
@@ -131,7 +143,7 @@ def get_params_clustering(dataset, category):
             'dataset': dataset,
             'category': category,
         }
-    else:
+    elif dataset.startswith('Caltech'):
         pathtosim_avg = '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/{}/sim/simMatrix_INIT.npy'\
             .format(dataset)
         pathtoimg = '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/{}/image_paths.txt'.format(dataset)
@@ -147,17 +159,55 @@ def get_params_clustering(dataset, category):
             'seqNames': None,
             'imagePath': imnames,
             'pathToFolder': pathtocrops,
-            'init_nCliques': 5,
-            'init_nbatches': 20,
+            'init_nCliques': 10,
+            'init_nbatches': 100,
             'max_cliques_per_batch': 8,
-            'batch_size': 64,
+            'batch_size': 128,
             'nSamples': 8,
             'anchors': None,
             'sampled_nbatches': 1000,
             'dataset': dataset,
             'category': category,
         }
+    elif dataset.startswith('STL'):
+        params = {
+            'pathtosim': None,
+            'pathtosim_avg': None,
+            'seqNames': None,
+            'imagePath': None,
+            'pathToFolder': None,
+            'init_nCliques': 10,
+            'init_nbatches': 100,
+            'max_cliques_per_batch': 8,
+            'batch_size': 128,
+            'nSamples': 8,
+            'anchors': None,
+            'sampled_nbatches': 10000,
+            'dataset': dataset,
+            'category': category,
+        }
+    elif dataset.startswith('pascal'):
+        pathtoimg = '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/VOC/path_images.txt'
+        pathtocrops = '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/VOC/crops_227x227/'
+        with open(pathtoimg) as f:
+            imnames = f.readlines()
 
+        params = {
+            'pathtosim': None,
+            'pathtosim_avg': '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/VOC/sim/simMatrix_stackedpca_train.npy',
+            'seqNames': None,
+            'imagePath': imnames,
+            'pathToFolder': pathtocrops,
+            'init_nCliques': 10,
+            'init_nbatches': 100,
+            'max_cliques_per_batch': 8,
+            'batch_size': 128,
+            'nSamples': 8,
+            'anchors': None,
+            'sampled_nbatches': 10000,
+            'dataset': dataset,
+            'category': category,
+        }
 
 
     return params
@@ -195,6 +245,34 @@ def runClustering(**params_clustering):
                                                          params_clustering['max_cliques_per_batch'],
                                                          mode='random')
         _x, _f, _y = params_clustering['sampler'].parse_to_list(batch)
+        indices = np.append(indices, _x.astype(dtype=np.int64))
+        flipped = np.append(flipped, _f.astype(dtype=np.bool))
+        label = np.append(label, _y.astype(dtype=np.int64))
+
+    assert indices.shape[0] == flipped.shape[0] == label.shape[0], "Corrupted arguments for batch loader"
+    return {'idxs': indices, 'flipvals': flipped, 'labels': label}, params_clustering
+
+def runClusteringSTL(**params_clustering):
+    """
+
+    :param params_clustering:
+    :return:
+    """
+    # Load cliques from list and initilize batch loader
+    pathtocliquesfile = '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/STL10/groups/cliques_stackedfeatures.pkl'
+    cliques_file = open(pathtocliquesfile, 'rb')
+    cliques = pickle.load(cliques_file)
+    sampler = BatchSampler(**{'batches': [cliques[0:params_clustering['num_classes']]]})
+    sampler.updateCliqueSampleProb(np.random.rand(params_clustering['num_classes']))
+
+    indices = np.empty(0, dtype=np.int64)
+    flipped = np.empty(0, dtype=np.bool)
+    label = np.empty(0, dtype=np.int64)
+    print 'Sampling batches'
+    for i in tqdm(range(params_clustering['sampled_nbatches'])):
+        batch = sampler.sampleBatch(params_clustering['batch_size'], params_clustering['max_cliques_per_batch'],
+                                    mode='random')
+        _x, _f, _y = sampler.parse_to_list(batch)
         indices = np.append(indices, _x.astype(dtype=np.int64))
         flipped = np.append(flipped, _f.astype(dtype=np.bool))
         label = np.append(label, _y.astype(dtype=np.int64))

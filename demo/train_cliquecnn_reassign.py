@@ -61,24 +61,24 @@ def setup_network(**params):
         del params['net']
         del params['loss']
         del params['train_op']
+    with tf.Graph().as_default():
+        net = tfext.alexnet.Alexnet(**params)
+        logits = net.fc8
+        loss = network_spec.loss(logits, net.y_gt)
+        train_op = network_spec.training(net, loss, **params)
 
-    net = tfext.alexnet.Alexnet(**params)
-    logits = net.fc8
-    loss = network_spec.loss(logits, net.y_gt)
-    train_op = network_spec.training(net, loss, **params)
+        # Add the Op to compare the logits to the labels during correct_classified_top1.
+        eval_correct_top1 = network_spec.correct_classified_top1(logits, net.y_gt)
+        accuracy = tf.cast(eval_correct_top1, tf.float32) / \
+                   tf.constant(params['batch_size'], dtype=tf.float32)
 
-    # Add the Op to compare the logits to the labels during correct_classified_top1.
-    eval_correct_top1 = network_spec.correct_classified_top1(logits, net.y_gt)
-    accuracy = tf.cast(eval_correct_top1, tf.float32) / \
-               tf.constant(params['batch_size'], dtype=tf.float32)
+        saver = tf.train.Saver()
 
-    saver = tf.train.Saver()
+        # Instantiate a SummaryWriter to output summaries and the Graph of the current sesion.
+        summary_writer = tf.train.SummaryWriter(params['output_dir'], net.sess.graph)
+        summary = tf.scalar_summary(['loss', 'batch_accuracy'], [loss, accuracy])
 
-    # Instantiate a SummaryWriter to output summaries and the Graph of the current sesion.
-    summary_writer = tf.train.SummaryWriter(params['output_dir'], net.sess.graph)
-    summary = tf.scalar_summary(['loss', 'batch_accuracy'], [loss, accuracy])
-
-    net.sess.run(tf.initialize_all_variables())
+        net.sess.run(tf.initialize_all_variables())
     return {'net': net, 'train_op': train_op, 'loss': loss, 'saver': saver, 'summary_writer': summary_writer, 'summary': summary}
 
 

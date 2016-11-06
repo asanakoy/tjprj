@@ -79,14 +79,11 @@ def setup_network(**params):
 
         # Loss for metric learning
         logits = net.fc8
-        norm_fc7 = tf.nn.l2_normalize(net.fc7, dim=1)
-        mu_pl = tf.placeholder(tf.float32, (None, 4096))
-        unique_mu_pl = tf.placeholder(tf.float32, (None, 4096))
-        sigma_pl = tf.placeholder(tf.float32, (1,))
-        loss = network_spec.loss_generative_discriminative(norm_fc7, logits, mu_pl, unique_mu_pl, sigma_pl, net.y_gt)
+        # norm_fc7 = tf.nn.l2_normalize(net.fc7, dim=1)
+        loss = network_spec.soft_xe(net.fc7, net.y_gt, alpha=0.1, num_classes_in_batch=8)
 
         # Group losses
-        train_op = network_spec.training(net, loss, **params)
+        train_op = network_spec.training_sgd(net, loss, params['base_lr'])
 
         # Add the Op to compare the logits to the labels during correct_classified_top1.
         eval_correct_top1 = network_spec.correct_classified_top1(logits, net.y_gt)
@@ -100,8 +97,10 @@ def setup_network(**params):
         summary = tf.scalar_summary(['loss', 'batch_accuracy'], [loss, accuracy])
 
         net.sess.run(tf.initialize_all_variables())
+        # net.restore_from_snapshot(params['snapshot_path_to_restore'], num_layers=7)
+
     return {'net': net, 'train_op': train_op, 'loss': loss, 'saver': saver, 'summary_writer': summary_writer,
-            'summary': summary, 'mu_ph': mu_pl, 'unique_mu_ph': unique_mu_pl, 'sigma_ph': sigma_pl}
+            'summary': summary}
 
 
 def run_training_current_clustering(**params):
@@ -117,14 +116,7 @@ def run_training_current_clustering(**params):
 
         # Fill a feed dictionary with the actual set of images and labels
         # for this particular training step.
-        feed_dict = tfext.utils.fill_feed_dict_magnet(net, params['mu_ph'], params['unique_mu_ph'], params['sigma_ph'], params['batch_ldr'], params['centroider'],
-                                               batch_size=params['batch_size'],
-                                               phase='train')
-
-        if step != 0 and step % 10000 == 0:
-            # Update centroids with created network
-            params['centroider'] = centroider.Centroider(params['batch_ldr'])
-            params['centroider'].updateCentroids(net.sess, net.x, net.fc7)
+        feed_dict = tfext.utils.fill_feed_dict_magnet(net, params['batch_ldr'], batch_size=params['batch_size'], phase='train')
 
         # Run one step of the model.  The return values are the activations
         # from the `train_op` (which is discarded) and the `loss` Op.  To
@@ -146,15 +138,15 @@ def run_training_current_clustering(**params):
                                                       feed_dict=feed_dict)
         duration = time.time() - start_time
 
-        if step % params['test_step'] == 0 or step + 1 == params['max_iter']:
-            nn_acc = eval.caltech.eval_from_net.nn_acc(net,
-                                                      params['category'],
-                                                      ['fc7'],
-                                                      mat_path=params['images_mat_filepath'],
-                                                      mean_path=params['mean_filepath'],
-                                                      batch_size=256)
-            params['summary_writer'].add_summary(tfext.utils.create_sumamry('NNACC', nn_acc), global_step=global_step)
-            params['summary_writer'].flush()
+        # if step % params['test_step'] == 0 or step + 1 == params['max_iter']:
+        #     nn_acc = eval.caltech.eval_from_net.nn_acc(net,
+        #                                               params['category'],
+        #                                               ['fc7'],
+        #                                               mat_path=params['images_mat_filepath'],
+        #                                               mean_path=params['mean_filepath'],
+        #                                               batch_size=256)
+        #     params['summary_writer'].add_summary(tfext.utils.create_sumamry('NNACC', nn_acc), global_step=global_step)
+        #     params['summary_writer'].flush()
 
         if step % log_step == 0 or step + 1 == params['max_iter']:
             print('Step %d: loss = %.2f (%.3f s, %.2f im/s)'
@@ -167,7 +159,7 @@ def run_training(**params):
 
     params_clustering = trainhelper.get_params_clustering(params['dataset'], params['category'])
 
-    for clustering_round in range(0, 4):
+    for clustering_round in range(0, 10):
 
 
         # Use HOGLDA for initial estimate of similarities
@@ -188,19 +180,9 @@ def run_training(**params):
         params['num_classes'] = batch_ldr_dict_params['labels'].max() + 1
         params['batch_ldr'] = batch_loader_with_prefetch.BatchLoaderWithPrefetch(params)
 
-        # Clean up batch loader
-        assert 'batch_ldr' in params, 'batch_ldr myst be in params'
-        params['batch_ldr'].cleanup_workers()
-        del params['batch_ldr']
-        gc.collect()
-
         # Create network with new clustering parameters and return it in network_params dict
         network_params = setup_network(**params)
         params.update(network_params)
-
-        # Update centroids with created network
-        params['centroider'] = centroider.Centroider(params['batch_ldr'])
-        params['centroider'].updateCentroids(params['net'].sess, params['net'].x, params['net'].fc7)
 
         # Restore from previous round model 
         if clustering_round > 0:
@@ -212,6 +194,12 @@ def run_training(**params):
         checkpoint_file = os.path.join(params['output_dir'], 'checkpoint')
         params['saver'].save(params['net'].sess, checkpoint_file, global_step=clustering_round + 1)
 
+        # Clean up batch loader
+        assert 'batch_ldr' in params, 'batch_ldr myst be in params'
+        params['batch_ldr'].cleanup_workers()
+        del params['batch_ldr']
+        gc.collect()
+
     params['net'].sess.close()
 
 
@@ -221,41 +209,41 @@ def main(argv):
     if len(argv) > 1:
         category = argv[1]
     else:
-        category = 'Caltech101'
-    dataset = 'Caltech101'
+        category = 'long_jump'
+    dataset = 'OlympicSports'
 
     data_path, indices_dir, output_dir = get_pathes(category, dataset)
     mean_path = os.path.join(indices_dir, 'mean.npy')
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-
     params = {
         'im_shape': (227, 227, 3),
-        'batch_size': 64,
-        'base_lr': 0.001,
+        'batch_size': 128,
+        'base_lr': 0.1,
         'fc_lr_mult': 1.0,
-        'conv_lr_mult': 1.0,
+        'conv_lr_mult': 0.1,
         'num_layers_to_init': 7,
         'dataset': dataset,
         'category': category,
         'num_classes': None,
         'snapshot_iter': 2000,
-        'max_iter': 20000,
+        'max_iter': 2000,
         'indexing_1_based': 0,
         'images_mat_filepath': data_path,
         'indexfile_path': None,
         'mean_filepath': mean_path,
         'seed': 1988,
-        'test_step': 20000,
+        'test_step': 2000,
         'output_dir': output_dir,
         'init_model': get_first_model_path(dataset),
         'device_id': '/gpu:{}'.format(int(argv[0])),
+        'snapshot_path_to_restore': '/export/home/asanakoy/workspace/OlympicSports/cnn/joint_categories_0.1conv_anchors/checkpoint-90002',
         'gpu_memory_fraction': 0.4,
         'shuffle_every_epoch': False,
-        'online_augmentations': False,
-        'async_preload': False,
-        'num_data_workers': 5,
+        'online_augmentations': True,
+        'async_preload': True,
+        'num_data_workers': 1,
         'batch_ldr': None,
         'augmenter_params': dict(hflip=True, vflip=False,
                                  scale_to_percent=(0.9, 1.1),

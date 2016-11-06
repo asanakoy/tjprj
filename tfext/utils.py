@@ -45,6 +45,7 @@ def fill_feed_dict(net, batch_loader, batch_size=128, phase='test'):
     return feed_dict
 
 
+
 def fill_feed_dict_convnet(net, batch_loader, batch_size=128, phase='test'):
     """Fills the feed_dict for training the given step.
 
@@ -84,7 +85,8 @@ def fill_feed_dict_convnet(net, batch_loader, batch_size=128, phase='test'):
     return feed_dict
 
 
-def fill_feed_dict_magnet(net, mu_ph, unique_mu_ph, sigma_ph, batch_loader, centroider, batch_size=128, phase='test'):
+def fill_feed_dict_magnet(net, batch_loader, batch_size=128, phase='test'):
+
     """Fills the feed_dict for training the given step.
 
     A feed_dict takes the form of:
@@ -111,21 +113,61 @@ def fill_feed_dict_magnet(net, mu_ph, unique_mu_ph, sigma_ph, batch_loader, cent
         is_phase_train = False
 
     images_feed, labels_feed = batch_loader.get_next_batch(batch_size)
-    mu_feed = centroider.get_nearest_mu(labels_feed)
-    _, unique_labels = np.unique(labels_feed, return_index=True)
-    unique_mu_feed = mu_feed[unique_labels]
-    sigma_feed = centroider.get_sigma(labels_feed)
+
+    unq_y = np.unique(labels_feed)
+    labels_feed_aux = np.where(np.tile(unq_y, (labels_feed.shape[0], 1)) == labels_feed.reshape(-1, 1))[1]
+
     # TODO: remove after I fix BatchLoader. Presently BatchLoader outputs CxHxW images.
     images_feed = images_feed.transpose((0, 2, 3, 1))
 
     feed_dict = {
         net.x: images_feed,
-        net.y_gt: labels_feed,
-        mu_ph: mu_feed,
-        unique_mu_ph: unique_mu_feed,
-        sigma_ph: sigma_feed,
+        net.y_gt: labels_feed_aux,
         net.fc6_keep_prob: keep_prob,
         net.fc7_keep_prob: keep_prob,
+        'input/is_phase_train:0': is_phase_train
+    }
+    return feed_dict
+
+
+def fill_feed_dict_stl(net, batch_loader, batch_size=128, phase='test'):
+    """Fills the feed_dict for training the given step.
+
+    A feed_dict takes the form of:
+    feed_dict = {
+        <placeholder>: <tensor of values to be passed for placeholder>,
+        ....
+    }
+
+    Args:
+      batch_loader: BatchLoader, that provides batches of the data
+      images_pl: The images placeholder, from placeholder_inputs().
+      labels_pl: The labels placeholder, from placeholder_inputs().
+
+    Returns:
+      feed_dict: The feed dictionary mapping from placeholders to values.
+    """
+    if phase not in ['train', 'test']:
+        raise ValueError('phase must be "train" or "test"')
+    if phase == 'train':
+        keep_prob = 0.5
+        is_phase_train = True
+    else:
+        keep_prob = 1.0
+        is_phase_train = False
+
+    images_feed, labels_feed = batch_loader.get_next_batch(batch_size)
+
+
+    # TODO: remove after I fix BatchLoader. Presently BatchLoader outputs CxHxW images.
+    images_feed = images_feed.transpose((0, 2, 3, 1))
+    unq_y = np.unique(labels_feed)
+    labels_feed_aux = np.where(np.tile(unq_y, (labels_feed.shape[0], 1)) == labels_feed.reshape(-1, 1))[1]
+
+    feed_dict = {
+        net.x: images_feed,
+        net.y_gt: labels_feed_aux,
+        net.dropout_keep_prob: keep_prob,
         'input/is_phase_train:0': is_phase_train
     }
     return feed_dict

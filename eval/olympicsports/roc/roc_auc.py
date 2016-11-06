@@ -168,5 +168,5 @@ def run_all_cat():
 if __name__ == '__main__':
     # run_all_cat()
     # compute_roc_auc_from_sim(['long_jump'], path_sim_matrix='/export/home/mbautist/Desktop/long_jump/simMatrix_long_jump_tf_0.1conv_1fc_growingiter2_iter_20000_fc7_zscores.mat')
-    compute_roc_auc_from_sim(['discus_throw'], path_sim_matrix='/export/home/asanakoy/workspace/OlympicSports/sim/tf/discus_throw/simMatrix_discus_throw_1_rounds_3_rounds_20k_aug_fc7_zscores.mat')
+    compute_roc_auc_from_sim(['long_jump'], path_sim_matrix='/export/home/mbautist/Desktop/fixed_magnet.mat')
     # compute_roc_auc_from_sim(['long_jump'])

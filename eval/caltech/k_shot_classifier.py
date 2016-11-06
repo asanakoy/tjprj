@@ -111,7 +111,7 @@ class ZeroShotClassifier(object):
         for class_idx in xrange(self.labels.max()):
             idxs_class = np.where(self.labels == class_idx)[0]
             idxs_test = np.append(idxs_test,
-                                  np.random.choice(idxs_class, np.min([idxs_class.shape[0], 50]), replace=False))
+                                  np.random.choice(idxs_class, np.min([idxs_class.shape[0], 25]), replace=False))
 
         return idxs_test.astype(dtype=np.int32)
 

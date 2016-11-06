@@ -57,70 +57,172 @@ def loss(logits, labels):
     loss_value = tf.reduce_mean(cross_entropy, name='xentropy_mean')
     return loss_value
 
-def loss_magnet(x, mu, unique_mu, sigma, y, alpha=1.0):
 
+def soft_xe(x, y, alpha, num_classes_in_batch):
 
-    # Compute squared distance of each example to each cluster centroid
-    d = tf.squared_difference(unique_mu, tf.expand_dims(x, 1))
-    d = tf.reduce_sum(d, 2)
+    # Compute each cluster representative (mean)
+    clique_examples = tf.dynamic_partition(x, y, num_classes_in_batch)
+    r = tf.pack([tf.reduce_mean(x_aux, 0) for x_aux in clique_examples])
+
+    # Compute distance from all points to all clusters representatives
+
+    dr = tf.squared_difference(tf.expand_dims(x, 1), r)
+    dr = tf.reduce_sum(dr, 2)
 
     # Select distances of examples to their own centroid
-    d_xi_mui = tf.squared_difference(mu, x)
-    d_xi_mui = tf.reduce_sum(d_xi_mui, 1)
+    assignment_clique = tf.to_float(comparison_mask(y, np.arange(num_classes_in_batch, dtype=np.int32)))
+    d_xi_ri = tf.reduce_sum(dr * assignment_clique, 1)
 
-    # Compute variance of intra-cluster distances
-    var_normalizer = -1.0 / (2.0 * sigma ** 2.0)
+    # Compute std of intra-cluster distances
+    N = tf.shape(x)[0]
+    sigma = tf.reduce_sum(d_xi_ri) / tf.to_float(N)
+    std_normalizer = -1.0 / (2.0 * sigma ** 2.0)
 
     # Compute numerator
-    numerator = tf.exp(var_normalizer * d_xi_mui - alpha)
+    numerator = tf.exp(std_normalizer * d_xi_ri - alpha)
 
     # Compute denominator
-    d_xi_muk = tf.exp(var_normalizer * d)
-    denominator = tf.reduce_sum(d_xi_muk, 1)
+    d_xi_rj = tf.exp(std_normalizer * dr)
+    denominator = tf.reduce_sum(d_xi_rj, 1)
 
     # Compute example losses and total loss
     epsilon = 1e-8
     losses = tf.nn.relu(-tf.log(numerator / (denominator + epsilon) + epsilon))
-    total_loss = tf.reduce_mean(losses)
+    soft_xe = tf.reduce_mean(losses)
+
+    return soft_xe
 
 
-    return total_loss
+
+def comparison_mask(a_labels, b_labels):
+    return tf.equal(tf.expand_dims(a_labels, 1),
+                    tf.expand_dims(b_labels, 0))
 
 
+def training_stl(net, loss, base_lr=None):
+    """Sets up the training Ops.
 
-def loss_generative_discriminative(x, logits, mu, unique_mu, sigma, y, alpha=1.0):
+    Creates a summarizer to track the loss over time in TensorBoard.
 
-    _lambda = tf.constant(1.0, dtype=tf.float32, shape=[1])
-    # Compute squared distance of each example to each cluster centroid
-    d = tf.squared_difference(unique_mu, tf.expand_dims(x, 1))
-    d = tf.reduce_sum(d, 2)
+    Creates an optimizer and applies the gradients to all trainable variables.
 
-    # Select distances of examples to their own centroid
-    d_xi_mui = tf.squared_difference(mu, x)
-    d_xi_mui = tf.reduce_sum(d_xi_mui, 1)
+    The Op returned by this function is what must be passed to the
+    `sess.run()` call to cause the model to train.
 
-    # Compute variance of intra-cluster distances
-    var_normalizer = -1.0 / (2.0 * sigma ** 2.0)
+    Args:
+      loss: Loss tensor, from loss().
+      learning_rate: The learning rate to use for gradient descent.
 
-    # Compute numerator
-    numerator = tf.exp(var_normalizer * d_xi_mui - alpha)
+    Returns:
+      train_op: The Op for training.
+    """
+    tf.scalar_summary(loss.op.name, loss)
+    # WARNING: initial_accumulator_value in caffe's AdaGrad is probably 0.0
+    update_ops = net.graph.get_collection(tf.GraphKeys.UPDATE_OPS)
+    assert len(update_ops) > 0
+    with tf.control_dependencies(update_ops):
+        optimizer = tf.train.AdagradOptimizer(base_lr, initial_accumulator_value=0.0001)
+        op = optimizer.minimize(loss=loss, global_step=net.global_iter_counter)
+    return op
 
-    # Compute denominator
-    d_xi_muk = tf.exp(var_normalizer * d)
-    denominator = tf.reduce_sum(d_xi_muk, 1)
+def training_sgd(net, loss, base_lr=None):
+    """Sets up the training Ops.
 
-    # Compute example losses and total loss
-    epsilon = 1e-8
-    losses = tf.nn.relu(-tf.log(numerator / (denominator + epsilon) + epsilon))
-    generative_loss = tf.reduce_mean(losses)
+    Creates a summarizer to track the loss over time in TensorBoard.
 
-    # Compute discriminative loss
-    y = tf.to_int64(y)
-    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
-        logits, y, name='xentropy')
-    discriminative_loss = tf.reduce_mean(cross_entropy, name='xentropy_mean')
+    Creates an optimizer and applies the gradients to all trainable variables.
 
-    return tf.add(generative_loss, discriminative_loss)
+    The Op returned by this function is what must be passed to the
+    `sess.run()` call to cause the model to train.
+
+    Args:
+      loss: Loss tensor, from loss().
+      learning_rate: The learning rate to use for gradient descent.
+
+    Returns:
+      train_op: The Op for training.
+    """
+    tf.scalar_summary(loss.op.name, loss)
+    optimizer = tf.train.GradientDescentOptimizer(base_lr)
+    op = optimizer.minimize(loss=loss)
+    return op
+
+def training_stl_eval(net, loss, base_lr=None):
+    """Sets up the training Ops.
+
+    Creates a summarizer to track the loss over time in TensorBoard.
+
+    Creates an optimizer and applies the gradients to all trainable variables.
+
+    The Op returned by this function is what must be passed to the
+    `sess.run()` call to cause the model to train.
+
+    Args:
+      loss: Loss tensor, from loss().
+      learning_rate: The learning rate to use for gradient descent.
+
+    Returns:
+      train_op: The Op for training.
+    """
+    tf.scalar_summary(loss.op.name, loss)
+    # WARNING: initial_accumulator_value in caffe's AdaGrad is probably 0.0
+    update_ops = net.graph.get_collection(tf.GraphKeys.UPDATE_OPS)
+    assert len(update_ops) > 0
+    with tf.control_dependencies(update_ops):
+        optimizer = tf.train.AdagradOptimizer(learning_rate=base_lr, initial_accumulator_value=0.0001)
+        # optimizer = tf.train.GradientDescentOptimizer(base_lr)
+        op = optimizer.minimize(loss=loss)
+    return op
+
+
+def training_sgd(net, loss, base_lr=None):
+    """Sets up the training Ops.
+
+    Creates a summarizer to track the loss over time in TensorBoard.
+
+    Creates an optimizer and applies the gradients to all trainable variables.
+
+    The Op returned by this function is what must be passed to the
+    `sess.run()` call to cause the model to train.
+
+    Args:
+      loss: Loss tensor, from loss().
+      learning_rate: The learning rate to use for gradient descent.
+
+    Returns:
+      train_op: The Op for training.
+    """
+    tf.scalar_summary(loss.op.name, loss)
+    optimizer = tf.train.GradientDescentOptimizer(base_lr)
+    op = optimizer.minimize(loss=loss)
+    return op
+
+def training_stl_eval(net, loss, base_lr=None):
+    """Sets up the training Ops.
+
+    Creates a summarizer to track the loss over time in TensorBoard.
+
+    Creates an optimizer and applies the gradients to all trainable variables.
+
+    The Op returned by this function is what must be passed to the
+    `sess.run()` call to cause the model to train.
+
+    Args:
+      loss: Loss tensor, from loss().
+      learning_rate: The learning rate to use for gradient descent.
+
+    Returns:
+      train_op: The Op for training.
+    """
+    tf.scalar_summary(loss.op.name, loss)
+    # WARNING: initial_accumulator_value in caffe's AdaGrad is probably 0.0
+    update_ops = net.graph.get_collection(tf.GraphKeys.UPDATE_OPS)
+    assert len(update_ops) > 0
+    with tf.control_dependencies(update_ops):
+        optimizer = tf.train.AdagradOptimizer(learning_rate=base_lr, initial_accumulator_value=0.0001)
+        # optimizer = tf.train.GradientDescentOptimizer(base_lr)
+        op = optimizer.minimize(loss=loss)
+    return op
 
 
 def training(net, loss_op, base_lr=None, fc_lr_mult=1.0, conv_lr_mult=1.0, **params):
