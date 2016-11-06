@@ -115,7 +115,7 @@ class Convnet(object):
             config.gpu_options.per_process_gpu_memory_fraction = gpu_memory_fraction
         self.sess = tf.Session(config=config)
 
-    def restore_from_snapshot(self, snapshot_path, num_layers):
+    def restore_from_snapshot(self, snapshot_path, num_layers, restore_iter_counter=True):
         """
         :param snapshot_path: path to the snapshot file
         :param num_layers: number layers to restore from the snapshot
@@ -130,6 +130,9 @@ class Convnet(object):
             raise ValueError('You can restore only 5 or 6 layers.')
         if num_layers == 0:
             return
+        if not restore_iter_counter:
+            raise ValueError('We can restore only everything including iter_counter')
+
         with self.graph.as_default():
             if num_layers == 5:
                 self.reset_fc6()
