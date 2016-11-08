@@ -267,28 +267,51 @@ def training(net, loss_op, base_lr=None, fc_lr_mult=1.0, conv_lr_mult=1.0, **par
     return tf.group(conv_tran_op, fc_tran_op)
 
 
-def training_convnet(net, loss_op, fc_lr, conv_lr):
+def training_convnet(net, loss_op, fc_lr, conv_lr, optimizer_type='adagrad', trace_gradients=False):
+    with net.graph.as_default():
+        if optimizer_type == 'adagrad':
+            conv_optimizer = tf.train.AdagradOptimizer(conv_lr,
+                                                       initial_accumulator_value=0.0001)
+            fc_optimizer = tf.train.AdagradOptimizer(fc_lr,
+                                                     initial_accumulator_value=0.0001)
+        elif optimizer_type == 'sgd':
+            conv_optimizer = tf.train.GradientDescentOptimizer(conv_lr)
+            fc_optimizer = tf.train.GradientDescentOptimizer(fc_lr)
+        elif optimizer_type == 'momentum':
+            conv_optimizer = tf.train.MomentumOptimizer(conv_lr, momentum=0.9)
+            fc_optimizer = tf.train.MomentumOptimizer(fc_lr, momentum=0.9)
+        else:
+            raise ValueError('Unknown optimizer type {}'.format(optimizer_type))
 
-    conv_optimizer = tf.train.AdagradOptimizer(conv_lr,
-                                               initial_accumulator_value=0.0001)
-    fc_optimizer = tf.train.AdagradOptimizer(fc_lr,
-                                             initial_accumulator_value=0.0001)
+        print('Conv LR: {}, FC LR: {}'.format(conv_lr, fc_lr))
 
-    print('Conv LR: {}, FC LR: {}'.format(conv_lr, fc_lr))
+        conv_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'conv')
+        fc_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'fc')
 
-    conv_vars = net.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'conv')
-    fc_vars = net.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'fc')
+        assert len(conv_vars) + len(fc_vars) == \
+            len(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)),\
+            'You dont train all the variables'
 
-    grads = tf.gradients(loss_op, conv_vars + fc_vars)
-    conv_grads = grads[:len(conv_vars)]
-    fc_grads = grads[len(conv_vars):]
-    assert len(conv_grads) + len(fc_grads) == len(conv_vars) + len(fc_vars)
-    update_ops = net.graph.get_collection(tf.GraphKeys.UPDATE_OPS)
-    with tf.control_dependencies(update_ops):
-        conv_tran_op = conv_optimizer.apply_gradients(zip(conv_grads, conv_vars))
-        fc_tran_op = fc_optimizer.apply_gradients(zip(fc_grads, fc_vars),
-                                                  global_step=net.global_iter_counter)
-    return tf.group(conv_tran_op, fc_tran_op)
+        grads = tf.gradients(loss_op, conv_vars + fc_vars)
+        conv_grads = grads[:len(conv_vars)]
+        fc_grads = grads[len(conv_vars):]
+        assert len(conv_grads) == len(conv_vars)
+        assert len(fc_grads) == len(fc_vars)
+
+        with tf.name_scope('grad_norms'):
+            for v, grad in zip(conv_vars + fc_vars, grads):
+                if grad is not None:
+                    grad_norm_op = tf.nn.l2_loss(grad, name=format(v.name[:-2]))
+                    tf.add_to_collection('grads', grad_norm_op)
+                    if trace_gradients:
+                        tf.scalar_summary(grad_norm_op.name, grad_norm_op)
+
+        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(update_ops):
+            conv_tran_op = conv_optimizer.apply_gradients(zip(conv_grads, conv_vars))
+            fc_tran_op = fc_optimizer.apply_gradients(zip(fc_grads, fc_vars),
+                                                      global_step=net.global_iter_counter)
+        return tf.group(conv_tran_op, fc_tran_op)
 
 
 def correct_classified_top1(logits, labels):
