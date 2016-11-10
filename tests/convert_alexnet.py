@@ -9,6 +9,8 @@ from trainhelper import trainhelper
 
 MODELS_DIR = '/export/home/asanakoy/workspace/tfprj/data'
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
+DATA_PATH = os.path.join(MODELS_DIR, 'bvlc_alexnet.npy')
+SNAPSHOT_PREFIX_PATH = '/export/home/asanakoy/workspace/tfprj/data/bvlc_alexnet.tf'
 
 
 def test_snaphot():
@@ -24,12 +26,11 @@ def test_snaphot():
     with tf.Graph().as_default():
         net = tfext.alexnet.Alexnet(**params)
         net.sess.run(tf.initialize_all_variables())
-        checkpoint_prefix = os.path.expanduser(
-            '/export/home/asanakoy/workspace/tfprj/data/bvlc_alexnet.tf')
+        checkpoint_prefix = SNAPSHOT_PREFIX_PATH
         saver = tf.train.Saver()
         saver.restore(net.sess, checkpoint_prefix)
 
-        net_data = np.load(os.path.join(MODELS_DIR, 'bvlc_alexnet.npy')).item()
+        net_data = np.load(DATA_PATH).item()
 
         for i in xrange(1, 6):
             name = 'conv{}'.format(i)
@@ -54,7 +55,7 @@ def test_snaphot():
 
 def convert():
     params = {
-        'init_model': os.path.join(MODELS_DIR, 'bvlc_alexnet.npy'),
+        'init_model': DATA_PATH,
         'num_classes': 1000,
         'device_id': '/gpu:0',
         'num_layers_to_init': 8,
@@ -66,8 +67,7 @@ def convert():
         net = tfext.alexnet.Alexnet(**params)
         net.sess.run(tf.initialize_all_variables())
         saver = tf.train.Saver()
-        checkpoint_prefix = os.path.expanduser(
-            '/export/home/asanakoy/workspace/tfprj/data/bvlc_alexnet.tf')
+        checkpoint_prefix = SNAPSHOT_PREFIX_PATH
         saver.save(net.sess, checkpoint_prefix, write_meta_graph=True)
         print 'Saved'
         net.sess.close()
