@@ -93,7 +93,6 @@ def soft_xe(x, y, alpha, num_classes_in_batch):
     return soft_xe
 
 
-
 def comparison_mask(a_labels, b_labels):
     return tf.equal(tf.expand_dims(a_labels, 1),
                     tf.expand_dims(b_labels, 0))
@@ -269,6 +268,7 @@ def training(net, loss_op, base_lr=None, fc_lr_mult=1.0, conv_lr_mult=1.0, **par
 
 def training_convnet(net, loss_op, fc_lr, conv_lr, optimizer_type='adagrad', trace_gradients=False):
     with net.graph.as_default():
+        print('Creating optimizer {}'.format(optimizer_type))
         if optimizer_type == 'adagrad':
             conv_optimizer = tf.train.AdagradOptimizer(conv_lr,
                                                        initial_accumulator_value=0.0001)

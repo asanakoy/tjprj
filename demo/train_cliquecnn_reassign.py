@@ -223,10 +223,10 @@ def main(argv):
         'num_data_workers': 5,
         'gpu_memory_fraction': 0.4,
         'augmenter_params': dict(hflip=False, vflip=False,
-                                 scale_to_percent=(0.9, 1.1),
+                                 scale_to_percent=(1.0, 2 ** 0.5),
                                  scale_axis_equally=True,
-                                 rotation_deg=10, shear_deg=7,
-                                 translation_x_px=30, translation_y_px=30)
+                                 rotation_deg=10, shear_deg=4,
+                                 translation_x_px=15, translation_y_px=15)
     }
     with open(os.path.join(output_dir, 'train_params.dump.txt'), 'w') as f:
         f.write('{}\n'.format(pprint.pformat(params)))
