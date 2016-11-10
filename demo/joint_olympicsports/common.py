@@ -17,6 +17,8 @@ import eval.olympicsports.roc.roc_from_net
 import eval.olympicsports.utils
 from helper import CATEGORIES
 from helper import BatchManager
+from tqdm import tqdm
+import pickle
 
 
 def get_num_classes(indices_path):
@@ -31,6 +33,48 @@ def get_num_classes(indices_path):
 
 def get_first_model_path():
     return '/export/home/asanakoy/workspace/tfprj/data/bvlc_alexnet.npy'
+
+
+def run_reclustering(**params_clustering):
+    """
+    Run clustering assignment procedure and return arrays for BatchLoader in a dict
+    :param kwargs_generator: arguments for generator
+    :param kwargs_sampler: arguments for sampler
+    :return: Dict of arrays for BatchLoader
+    """
+    from clustering.batchgenerator import BatchGenerator
+    from clustering.batchsampler import BatchSampler
+    generator = BatchGenerator(**params_clustering)
+    init_batches = generator.generateBatches(params_clustering['init_nbatches'])
+    params_clustering['batches'] = init_batches
+    params_clustering['sampler'] = BatchSampler(**params_clustering)
+    params_clustering['sampler'].updateCliqueSampleProb(
+        np.ones(len(params_clustering['sampler'].cliques)))
+
+    # # Save batchsampler
+    sampler_file = open(os.path.join(params_clustering['output_dir'], 'sampler_round_' + str(
+        params_clustering['clustering_round']) + '.pkl'), 'wb')
+    pickle.dump(params_clustering['sampler'].cliques, sampler_file, pickle.HIGHEST_PROTOCOL)
+    sampler_file.close()
+
+    indices = np.empty(0, dtype=np.int64)
+    flipped = np.empty(0, dtype=np.bool)
+    label = np.empty(0, dtype=np.int64)
+    print 'Sampling batches'
+    for i in tqdm(range(params_clustering['sampled_nbatches'])):
+        # print "Sampling batch {}".format(i)
+        batch = params_clustering['sampler'].sampleBatch(params_clustering['batch_size'],
+                                                         params_clustering[
+                                                             'max_cliques_per_batch'],
+                                                         mode='random')
+        _x, _f, _y = params_clustering['sampler'].parse_to_list(batch)
+        indices = np.append(indices, _x.astype(dtype=np.int64))
+        flipped = np.append(flipped, _f.astype(dtype=np.bool))
+        label = np.append(label, _y.astype(dtype=np.int64))
+
+    assert indices.shape[0] == flipped.shape[0] == label.shape[
+        0], "Corrupted arguments for batch loader"
+    return {'idxs': indices, 'flipvals': flipped, 'labels': label}, params_clustering
 
 
 def setup_alexnet_network(num_classes, snapshot_path_to_restore=None, **params):
@@ -52,8 +96,10 @@ def setup_alexnet_network(num_classes, snapshot_path_to_restore=None, **params):
 
     saver = tf.train.Saver()
 
-    # Instantiate a SummaryWriter to output summaries and the Graph of the current sesion.
-    tf.scalar_summary(['loss', 'batch_accuracy', 'conv_lr', 'fc_lr'], [loss_op, accuracy, conv_lr_pl, fc_lr_pl])
+    conv5w_norm = tf.nn.l2_loss(net.graph.get_tensor_by_name('conv5/weight:0'))
+    conv5b_norm = tf.nn.l2_loss(net.graph.get_tensor_by_name('conv5/bias:0'))
+    tf.scalar_summary(['loss', 'batch_accuracy', 'conv_lr', 'fc_lr', 'conv5w_norm', 'conv5b_norm'],
+                      [loss_op, accuracy, conv_lr_pl, fc_lr_pl, conv5w_norm, conv5b_norm])
 
     net.sess.run(tf.initialize_all_variables())
     if snapshot_path_to_restore is not None:
@@ -69,9 +115,6 @@ def setup_convnet_network(num_classes, snapshot_path_to_restore=None, **params):
         conv_lr_pl = tf.placeholder(tf.float32, tuple(), name='conv_lr')
         fc_lr_pl = tf.placeholder(tf.float32, tuple(), name='fc_lr')
     loss_op = network_spec.loss(net.logits, net.y_gt)
-    train_op = network_spec.training_convnet(net, loss_op,
-                                             fc_lr=fc_lr_pl,
-                                             conv_lr=conv_lr_pl)
 
     # Add the Op to compare the logits to the labels during correct_classified_top1.
     eval_correct_top1 = network_spec.correct_classified_top1(net.logits, net.y_gt)
@@ -80,17 +123,31 @@ def setup_convnet_network(num_classes, snapshot_path_to_restore=None, **params):
 
     saver = tf.train.Saver()
 
-    # Instantiate a SummaryWriter to output summaries and the Graph of the current sesion.
-    tf.scalar_summary(['loss', 'batch_accuracy', 'conv_lr', 'fc_lr'], [loss_op, accuracy, conv_lr_pl, fc_lr_pl])
+    conv5w_norm = tf.nn.l2_loss(net.graph.get_tensor_by_name('conv5/weight:0'))
+    conv5b_norm = tf.nn.l2_loss(net.graph.get_tensor_by_name('conv5/bias:0'))
+    tf.scalar_summary(['loss', 'batch_accuracy', 'conv_lr', 'fc_lr', 'conv5w_norm', 'conv5b_norm'],
+                      [loss_op, accuracy, conv_lr_pl, fc_lr_pl, conv5w_norm, conv5b_norm])
 
     net.sess.run(tf.initialize_all_variables())
     # init with alexnet if necessary
     net.restore_from_alexnet_snapshot(trainhelper.get_alexnet_snapshot_path(),
                                       params['num_layers_to_init'])
-
     if snapshot_path_to_restore is not None:
         print('Restoring 5 layers from snapshot {}'.format(snapshot_path_to_restore))
         net.restore_from_snapshot(snapshot_path_to_restore, 5)
+
+    optimizer_type = 'adagrad'
+    train_op = network_spec.training_convnet(net, loss_op,
+                                             fc_lr=fc_lr_pl,
+                                             conv_lr=conv_lr_pl,
+                                             optimizer_type=optimizer_type,
+                                             trace_gradients=True)
+    uninit_vars = [v for v in tf.all_variables()
+                   if not tf.is_variable_initialized(v).eval(session=net.sess)]
+    print 'uninit vars:', [v.name for v in uninit_vars]
+    assert optimizer_type == 'sgd' or len(uninit_vars) > 0
+    net.sess.run(tf.initialize_variables(uninit_vars))
+
     return net, train_op, loss_op, saver
 
 
@@ -113,7 +170,7 @@ def eval_all_cat(net, step, global_step, summary_writer, params):
                                     mat_path=params['images_mat_pathes'][category],
                                     mean_path=params['mean_filepath'])
 
-        print 'Step {}: {} ROCAUC = {}'.format(step, category, cur_cat_roc_dict)
+        print 'Step {}: {} ROCAUC = {}'.format(global_step, category, cur_cat_roc_dict)
         for layer_name, auc in cur_cat_roc_dict.iteritems():
             aucs[layer_name].append(auc)
             summary_writer.add_summary(
@@ -174,7 +231,7 @@ def run_training_current_clustering(net, batch_manager, train_op, loss_op,
 
         if step % log_step == 0 or step + 1 == params['max_iter']:
             print('Step %d: loss = %.2f (%.3f s, %.2f im/s)'
-                  % (step, loss_value, duration,
+                  % (global_step, loss_value, duration,
                      params['batch_size'] / duration))
 
 
@@ -199,7 +256,7 @@ def cluster_category(clustering_round, category, output_dir, params_clustering):
     params_clustering['clustering_round'] = clustering_round
     params_clustering['output_dir'] = output_dir
     # TODO: maybe recluster next round not on anchors
-    index_dict, _ = trainhelper.run_reclustering(**params_clustering)
+    index_dict, _ = run_reclustering(**params_clustering)
     return index_dict
 
 
@@ -264,7 +321,15 @@ def run_training(**params):
         # Restore from previous round model
         if clustering_round > 0:
             checkpoint_path = checkpoint_prefix + '-' + str(clustering_round)
-            net.restore_from_snapshot(checkpoint_path, 7, restore_iter_counter=True)
+            num_layers_to_restore = 7 if params['network'] == tfext.alexnet.Alexnet else 5
+            net.restore_from_snapshot(checkpoint_path, num_layers_to_restore, restore_iter_counter=True)
+
+        with net.graph.as_default():
+            print 'Reset momentum and Adagrad accumulators'
+            optimizer_vars = [v for v in tf.all_variables()
+                           if 'adagrad' in v.name.lower() or 'momentum' in v.name.lower()]
+            print [v.name for v in optimizer_vars]
+            tf.initialize_variables(optimizer_vars)
 
         # Run training and save snapshot
         run_training_current_clustering(net, batch_manager, train_op, loss_op,
