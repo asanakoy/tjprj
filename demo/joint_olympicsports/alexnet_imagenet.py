@@ -21,7 +21,7 @@ def get_pathes(is_bbox_sq):
     images_mat_pathes = {cat: '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/OlympicSports/crops/{}/images.mat'.format(
                         cat) for cat in CATEGORIES}
 
-    output_dir = os.path.expanduser('/export/home/asanakoy/workspace/OlympicSports/cnn/joint_categories_0.1conv_anchors')
+    output_dir = os.path.expanduser('/export/home/asanakoy/workspace/OlympicSports/cnn/alexnet_joint_categories')
     # output_dir = os.path.join(os.path.expanduser('~/tmp/tf_test'))
     mean_path = os.path.join(output_dir, 'mean.npy')
     return images_mat_pathes, mean_path, output_dir
@@ -38,19 +38,19 @@ def main(argv):
         'batch_size': 128,
         'fc_lr': 0.001,
         'conv_lr': 0.0001,
-        'fix_conv_iter': 5000,
+        'fix_conv_iter': 10000,
 
         'test_layers': ['maxpool5', 'fc6', 'fc7'],
-        'snapshot_path_to_restore': '/export/home/asanakoy/workspace/OlympicSports/cnn/joint_categories_0.1conv_anchors/round_checkpoint-1',
+        'snapshot_path_to_restore': '/export/home/asanakoy/workspace/OlympicSports/cnn/alexnet_joint_categories_begin/checkpoint-325004',
         'init_model': get_first_model_path(),
         'num_layers_to_init': 0,
         'network': tfext.alexnet.Alexnet,
 
-        'max_iter': 40000,
+        'max_iter': 50000,
         'snapshot_iter': 10000,
         'test_step': 5000,
         'num_clustering_rounds': 200,
-        'init_nbatches': None,
+        'init_nbatches': 110,
 
         'dataset': 'OlympicSports',
         'images_mat_pathes': images_mat_pathes,
@@ -63,7 +63,7 @@ def main(argv):
         'online_augmentations': True,
         'async_preload': False,
         'num_data_workers': 1,
-        'gpu_memory_fraction': 0.5,
+        'gpu_memory_fraction': 0.9,
         'augmenter_params': dict(hflip=False, vflip=False,
                                  scale_to_percent=(1.0, 2 ** 0.5),
                                  scale_axis_equally=True,
