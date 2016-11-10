@@ -61,7 +61,7 @@ if __name__ == '__main__':
         batch[i, ...] = im
     batch = batch[:, :, :, ::-1]
 
-    for i in range(20):
+    for i in range(100):
         # batch = np.random.random((10, 227, 227, 3))
         y = [205, 344, 356, 1, 84]
         # y = label_binarize(y, classes=range(1000))
@@ -80,7 +80,7 @@ if __name__ == '__main__':
                                                        net.fc6_keep_prob: 1.0,
                                                        net.fc7_keep_prob: 1.0,
                                                        net.is_phase_train: False})
-        print("step %d, training accuracy %f" % (global_iter, train_accuracy))
+            print("step %d, training accuracy %f" % (global_iter, train_accuracy))
 
     # from trainhelper.trainhelper import get_sim
     # d = get_sim(net, 'long_jump', ['fc7'], return_features=False)

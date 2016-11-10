@@ -116,15 +116,11 @@ class Alexnet(object):
 
                 # lrn1
                 # lrn(2, 2e-05, 0.75, name='norm1')
-                radius = 2
-                alpha = 2e-05
-                beta = 0.75
-                bias = 1.0
                 lrn1 = tf.nn.local_response_normalization(conv1,
-                                                          depth_radius=radius,
-                                                          alpha=alpha,
-                                                          beta=beta,
-                                                          bias=bias, name='lrn')
+                                                          depth_radius=2,
+                                                          alpha=2e-05,
+                                                          beta=0.75,
+                                                          bias=1.0, name='lrn')
 
                 # maxpool1
                 # max_pool(3, 3, 2, 2, padding='VALID', name='pool1')
@@ -158,14 +154,10 @@ class Alexnet(object):
 
                 # lrn2
                 # lrn(2, 2e-05, 0.75, name='norm2')
-                radius = 2
-                alpha = 2e-05
-                beta = 0.75
-                bias = 1.0
-                lrn2 = tf.nn.local_response_normalization(conv2, depth_radius=radius,
-                                                          alpha=alpha,
-                                                          beta=beta,
-                                                          bias=bias)
+                lrn2 = tf.nn.local_response_normalization(conv2, depth_radius=2,
+                                                          alpha=2e-05,
+                                                          beta=0.75,
+                                                          bias=1.0)
 
                 # maxpool2
                 # max_pool(3, 3, 2, 2, padding='VALID', name='pool2')
@@ -330,14 +322,20 @@ class Alexnet(object):
         if num_layers > 8 or num_layers < 0:
             raise ValueError('You can restore only 0 to 8 layers.')
         if num_layers == 0:
+            print 'Not restoring anything'
             return
         items = self.trainable_vars.items()
         items.sort()
         vars_names_to_restore = [items[i][0] for i in xrange(num_layers * 2)]
         vars_to_restore = [items[i][1] for i in xrange(num_layers * 2)]
-        print 'Restoring {} from the snapshot'.format(vars_names_to_restore)
+        print 'Restoring {} layers from the snapshot: {}'.format(num_layers, vars_names_to_restore)
         if restore_iter_counter:
-            vars_to_restore += [self.global_iter_counter]
+            try:
+                saver = tf.train.Saver(var_list=[self.global_iter_counter])
+                saver.restore(self.sess, snapshot_path)
+            except:
+                print 'Could not restore global_iter_counter.'
+
         with self.graph.as_default():
             saver = tf.train.Saver(var_list=vars_to_restore)
             saver.restore(self.sess, snapshot_path)
@@ -384,8 +382,11 @@ class Alexnet(object):
             bias_init_value = bias_init_values[layer_index]
         else:
             l_name = 'layer {}'.format(layer_index)
-            if wights_std is None or bias_init_value is None:
-                raise ValueError('std and bias must be provided for all layers beyond 1..8')
+            if self.random_init_type == Alexnet.RandomInitType.GAUSSIAN and \
+                    (wights_std is None):
+                raise ValueError('wights_std must be provided for all layers beyond 1..8 with RandomInitType.GAUSSIAN')
+            if bias_init_value is None:
+                raise ValueError('bias_init_value must be provided for all layers beyond 1..8')
 
         if net_data is not None and layer_index < self.num_layers_to_init:
             assert net_data[l_name]['weights'].shape == (num_inputs, num_outputs)
