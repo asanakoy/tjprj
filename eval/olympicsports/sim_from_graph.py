@@ -9,10 +9,14 @@ import eval.features
 import eval.olympicsports.utils
 from utils import get_sim_pathes
 
-Net = namedtuple('Net', ['sess', 'fc6', 'maxpool5', 'graph'])
+Net = namedtuple('Net', ['sess', 'fc7', 'fc6', 'maxpool5', 'conv5', 'graph'])
 
 
-def load_net(snapshot_path, gpu_memory_fraction=None):
+def load_net(snapshot_path, gpu_memory_fraction=None,
+             conv5=None,
+             maxpool5=None,
+             fc6=None,
+             fc7=None):
     graph_path = snapshot_path + '.meta'
     if not os.path.exists(graph_path):
         raise IOError('Graph meta file not found: {}'.format(graph_path))
@@ -31,25 +35,27 @@ def load_net(snapshot_path, gpu_memory_fraction=None):
         new_saver = tf.train.import_meta_graph(graph_path)
         new_saver.restore(sess, snapshot_path)
 
-        fc6 = tf.get_default_graph().get_tensor_by_name('fc6/fc6:0')
-        maxpool5 = tf.get_default_graph().get_tensor_by_name('maxpool5:0')
-        return Net(sess=sess, fc6=fc6, maxpool5=maxpool5, graph=graph)
+        return Net(sess=sess, graph=graph,
+                   conv5=None if conv5 is None else tf.get_default_graph().get_tensor_by_name(conv5),
+                   maxpool5=None if maxpool5 is None else tf.get_default_graph().get_tensor_by_name(maxpool5),
+                   fc6=None if fc6 is None else tf.get_default_graph().get_tensor_by_name(fc6),
+                   fc7=None if fc7 is None else tf.get_default_graph().get_tensor_by_name(fc7))
 
 
 if __name__ == '__main__':
     category = 'long_jump'
 
     mat_path = '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/OlympicSports/crops/' + category + '/images.mat'
-    model_name = 'convnet_scratch'
+    model_name = 'alexnet_joint_categories_begin'
 
+    category = ''
     mean_path = join(
         '/export/home/asanakoy/workspace/OlympicSports/cnn/', model_name, category, 'mean.npy')
     mean = np.load(mean_path)
 
     params = {
         'category': category,
-        'number_layers_restore': 6,
-        'layer_names': ['maxpool5'],
+        'layer_names': ['fc7'],
         'norm_method': None,
         'image_getter': ImageGetterFromMat(mat_path),
         'mean': mean,
@@ -60,13 +66,20 @@ if __name__ == '__main__':
         'device_id': '/gpu:{}'.format(0)
     }
     snapshot_path, sim_output_path = get_sim_pathes(model_name,
-                                                              iteration=None,
-                                                              round_id=1,
+                                                              iteration=170004,
+                                                              round_id=None,
                                                               **params)
-    net = load_net(snapshot_path, gpu_memory_fraction=0.3)
+    net = load_net(snapshot_path, gpu_memory_fraction=0.4,
+                   conv5='conv5/conv5',
+                   maxpool5='conv5/maxpool:0',
+                   fc6='fc6/fc:0',
+                   fc7='fc7/fc:0'
+                   )
+
     print 'Using Snapshot:', snapshot_path
     print 'Output sim matrix to', sim_output_path
     eval.features.compute_sim_and_save(sim_output_path, net=net, **params)
     net.sess.close()
     print params['layer_names']
-    eval.olympicsports.roc.roc_auc.compute_roc_auc_from_sim([category], path_sim_matrix=sim_output_path)
+    # WARNING! Don't forget to change to the category variable when testing non-joint models!
+    eval.olympicsports.roc.roc_auc.compute_roc_auc_from_sim(['long_jump'], path_sim_matrix=sim_output_path)
