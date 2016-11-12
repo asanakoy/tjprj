@@ -58,14 +58,27 @@ def loss(logits, labels):
     return loss_value
 
 
-def soft_xe(x, y, alpha, num_classes_in_batch):
+def soft_xe(x, y, alpha, num_classes_in_batch, sess=None):
 
-    # Compute each cluster representative (mean)
+    """
+    This function computes the soft cross entropy loss.
+    :param x: representation of samples in batch (batch_size, ndims)
+    :param y: labels for each sample [0, k]
+    :param alpha: gap between positive and negative classes
+    :param num_classes_in_batch: number of classes in the batch
+    :param sess: session for debugging purposes
+    :return:
+    """
+    # Compute each cluster representative (centroid)
     clique_examples = tf.dynamic_partition(x, y, num_classes_in_batch)
-    r = tf.pack([tf.reduce_mean(x_aux, 0) for x_aux in clique_examples])
+    idxs_centroid = []
+    for clique in clique_examples:
+        sqdif = tf.reduce_sum(tf.squared_difference(tf.expand_dims(clique, 1), clique), 2)
+        tf.Print(sqdif, [sqdif], 'This is sqdif')
+        idxs_centroid.append(tf.to_int32(tf.argmin(tf.reduce_sum(sqdif, 0), 0)))
+    r = tf.pack([x_aux[idxs_centroid[_i]] for _i, x_aux in enumerate(clique_examples)])
 
     # Compute distance from all points to all clusters representatives
-
     dr = tf.squared_difference(tf.expand_dims(x, 1), r)
     dr = tf.reduce_sum(dr, 2)
 
@@ -88,9 +101,8 @@ def soft_xe(x, y, alpha, num_classes_in_batch):
     # Compute example losses and total loss
     epsilon = 1e-8
     losses = tf.nn.relu(-tf.log(numerator / (denominator + epsilon) + epsilon))
-    soft_xe = tf.reduce_mean(losses)
+    return tf.reduce_mean(losses)
 
-    return soft_xe
 
 
 def comparison_mask(a_labels, b_labels):
@@ -142,57 +154,7 @@ def training_sgd(net, loss, base_lr=None):
       train_op: The Op for training.
     """
     tf.scalar_summary(loss.op.name, loss)
-    optimizer = tf.train.GradientDescentOptimizer(base_lr)
-    op = optimizer.minimize(loss=loss)
-    return op
-
-def training_stl_eval(net, loss, base_lr=None):
-    """Sets up the training Ops.
-
-    Creates a summarizer to track the loss over time in TensorBoard.
-
-    Creates an optimizer and applies the gradients to all trainable variables.
-
-    The Op returned by this function is what must be passed to the
-    `sess.run()` call to cause the model to train.
-
-    Args:
-      loss: Loss tensor, from loss().
-      learning_rate: The learning rate to use for gradient descent.
-
-    Returns:
-      train_op: The Op for training.
-    """
-    tf.scalar_summary(loss.op.name, loss)
-    # WARNING: initial_accumulator_value in caffe's AdaGrad is probably 0.0
-    update_ops = net.graph.get_collection(tf.GraphKeys.UPDATE_OPS)
-    assert len(update_ops) > 0
-    with tf.control_dependencies(update_ops):
-        optimizer = tf.train.AdagradOptimizer(learning_rate=base_lr, initial_accumulator_value=0.0001)
-        # optimizer = tf.train.GradientDescentOptimizer(base_lr)
-        op = optimizer.minimize(loss=loss)
-    return op
-
-
-def training_sgd(net, loss, base_lr=None):
-    """Sets up the training Ops.
-
-    Creates a summarizer to track the loss over time in TensorBoard.
-
-    Creates an optimizer and applies the gradients to all trainable variables.
-
-    The Op returned by this function is what must be passed to the
-    `sess.run()` call to cause the model to train.
-
-    Args:
-      loss: Loss tensor, from loss().
-      learning_rate: The learning rate to use for gradient descent.
-
-    Returns:
-      train_op: The Op for training.
-    """
-    tf.scalar_summary(loss.op.name, loss)
-    optimizer = tf.train.GradientDescentOptimizer(base_lr)
+    optimizer = tf.train.MomentumOptimizer(learning_rate=base_lr, momentum=0.9)
     op = optimizer.minimize(loss=loss)
     return op
 
@@ -244,9 +206,9 @@ def training(net, loss_op, base_lr=None, fc_lr_mult=1.0, conv_lr_mult=1.0, **par
     tf.scalar_summary(loss_op.op.name, loss_op)
     # WARNING: initial_accumulator_value in caffe's AdaGrad is probably 0.0
     conv_optimizer = tf.train.AdagradOptimizer(base_lr * conv_lr_mult,
-                                               initial_accumulator_value=0.0001)
+                                               initial_accumulator_value=0.0000001)
     fc_optimizer = tf.train.AdagradOptimizer(base_lr * fc_lr_mult,
-                                             initial_accumulator_value=0.0001)
+                                             initial_accumulator_value=0.0000001)
 
     print('Conv LR: {}, FC LR: {}'.format(base_lr * conv_lr_mult, base_lr * fc_lr_mult))
 
@@ -264,6 +226,144 @@ def training(net, loss_op, base_lr=None, fc_lr_mult=1.0, conv_lr_mult=1.0, **par
     fc_tran_op = fc_optimizer.apply_gradients(zip(fc_grads, fc_vars),
                                               global_step=net.global_iter_counter)
     return tf.group(conv_tran_op, fc_tran_op)
+
+def training_fix_upto_fc6(net, loss_op, lower_lr, upper_lr):
+
+    conv_optimizer = tf.train.AdagradOptimizer(learning_rate=lower_lr, initial_accumulator_value=0.00001)
+    fc_optimizer = tf.train.AdagradOptimizer(learning_rate=upper_lr, initial_accumulator_value=0.00001)
+
+    print('Lower(incl fc6) LR: {}, Upper LR: {}'.format(lower_lr, upper_lr))
+
+    fixed_vars = net.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'conv') +\
+                net.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'fc6')
+    variable_vars = net.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'fc')
+    variable_vars = [tensor for tensor in variable_vars if not str(tensor.name).startswith('fc6')]
+
+    grads = tf.gradients(loss_op, fixed_vars + variable_vars)
+    conv_grads = grads[:len(fixed_vars)]
+    fc_grads = grads[len(fixed_vars):]
+    assert len(conv_grads) + len(fc_grads) == len(fixed_vars) + len(variable_vars)
+    update_ops = net.graph.get_collection(tf.GraphKeys.UPDATE_OPS)
+    with tf.control_dependencies(update_ops):
+        conv_tran_op = conv_optimizer.apply_gradients(zip(conv_grads, fixed_vars))
+        fc_tran_op = fc_optimizer.apply_gradients(zip(fc_grads, variable_vars),
+                                                  global_step=net.global_iter_counter)
+    return tf.group(conv_tran_op, fc_tran_op)
+
+def training_stl_freeze_conv9(net, loss_op, base_lr):
+
+    lower_optimizer = tf.train.MomentumOptimizer(learning_rate=base_lr, momentum=0.9)
+    upper_optimizer = tf.train.MomentumOptimizer(learning_rate=base_lr, momentum=0.9)
+
+    print('Lower LR: {}, Upper LR: {}'.format(base_lr, base_lr))
+
+    fixed_vars = net.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'conv')
+    variable_vars = net.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'fc')
+
+    # Filter tensors into fixed and variable
+    fixed_vars_aux = []
+    for tensor in fixed_vars:
+        tensor_name = str(tensor.name)
+        tensor_num = int(filter(str.isdigit, tensor_name)[0])
+        if tensor_num <= 9:
+            fixed_vars_aux.append(tensor)
+        else:
+            variable_vars.append(tensor)
+    fixed_vars = fixed_vars_aux
+
+    grads = tf.gradients(loss_op, fixed_vars + variable_vars)
+    lower_grads = grads[:len(fixed_vars)]
+    upper_grads = grads[len(fixed_vars):]
+    assert len(lower_grads) + len(upper_grads) == len(fixed_vars) + len(variable_vars)
+    update_ops = net.graph.get_collection(tf.GraphKeys.UPDATE_OPS)
+    with tf.control_dependencies(update_ops):
+        conv_tran_op = lower_optimizer.apply_gradients(zip(lower_grads, fixed_vars))
+        fc_tran_op = upper_optimizer.apply_gradients(zip(upper_grads, variable_vars),
+                                                  global_step=net.global_iter_counter)
+    return tf.group(conv_tran_op, fc_tran_op)
+
+
+
+def training_warmup_stl(net, loss_op, lower_lr, upper_lr):
+
+    conv_optimizer = tf.train.AdagradOptimizer(lower_lr,
+                                               initial_accumulator_value=0.0001)
+    fc_optimizer = tf.train.AdagradOptimizer(upper_lr,
+                                             initial_accumulator_value=0.0001)
+
+    print('Lower(incl fc6) LR: {}, Upper LR: {}'.format(lower_lr, upper_lr))
+
+    fixed_vars = net.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'conv')
+    variable_vars = net.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'fc')
+
+    grads = tf.gradients(loss_op, fixed_vars + variable_vars)
+    conv_grads = grads[:len(fixed_vars)]
+    fc_grads = grads[len(fixed_vars):]
+    assert len(conv_grads) + len(fc_grads) == len(fixed_vars) + len(variable_vars)
+    update_ops = net.graph.get_collection(tf.GraphKeys.UPDATE_OPS)
+    with tf.control_dependencies(update_ops):
+        conv_tran_op = conv_optimizer.apply_gradients(zip(conv_grads, fixed_vars))
+        fc_tran_op = fc_optimizer.apply_gradients(zip(fc_grads, variable_vars),
+                                                  global_step=net.global_iter_counter)
+    return tf.group(conv_tran_op, fc_tran_op)
+
+
+def training_warmup_stl_exemplarcnn(net, loss_op, lower_lr, upper_lr):
+
+    lower_optimizer = tf.train.MomentumOptimizer(lower_lr, momentum=0.9)
+    upper_optimizer = tf.train.MomentumOptimizer(upper_lr, momentum=0.9)
+
+    print('Lower(incl fc6) LR: {}, Upper LR: {}'.format(lower_lr, upper_lr))
+
+    lower_vars = net.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'input/conv')
+    upper_vars = net.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'fc')
+
+    # Filter out fc6 which is fixed
+    upper_vars_aux = []
+    for tensor in upper_vars:
+        tensor_name = str(tensor.name)
+        tensor_num = int(filter(str.isdigit, tensor_name)[0])
+        if tensor_num == 6:
+            lower_vars.append(tensor)
+        else:
+            upper_vars_aux.append(tensor)
+    upper_vars = upper_vars_aux
+
+    grads = tf.gradients(loss_op, lower_vars + upper_vars)
+    lower_grads = grads[:len(lower_vars)]
+    upper_grads = grads[len(lower_vars):]
+    assert len(lower_grads) + len(upper_grads) == len(lower_vars) + len(upper_vars)
+    update_ops = net.graph.get_collection(tf.GraphKeys.UPDATE_OPS)
+    with tf.control_dependencies(update_ops):
+        conv_tran_op = lower_optimizer.apply_gradients(zip(lower_grads, lower_vars))
+        fc_tran_op = upper_optimizer.apply_gradients(zip(upper_grads, upper_vars),
+                                                  global_step=net.global_iter_counter)
+    return tf.group(conv_tran_op, fc_tran_op)
+
+def training_warmup_stl(net, loss_op, lower_lr, upper_lr):
+
+    conv_optimizer = tf.train.AdagradOptimizer(lower_lr,
+                                               initial_accumulator_value=0.0001)
+    fc_optimizer = tf.train.AdagradOptimizer(upper_lr,
+                                             initial_accumulator_value=0.0001)
+
+    print('Lower(incl fc6) LR: {}, Upper LR: {}'.format(lower_lr, upper_lr))
+
+    fixed_vars = net.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'conv')
+    variable_vars = net.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'fc')
+
+    grads = tf.gradients(loss_op, fixed_vars + variable_vars)
+    conv_grads = grads[:len(fixed_vars)]
+    fc_grads = grads[len(fixed_vars):]
+    assert len(conv_grads) + len(fc_grads) == len(fixed_vars) + len(variable_vars)
+    update_ops = net.graph.get_collection(tf.GraphKeys.UPDATE_OPS)
+    with tf.control_dependencies(update_ops):
+        conv_tran_op = conv_optimizer.apply_gradients(zip(conv_grads, fixed_vars))
+        fc_tran_op = fc_optimizer.apply_gradients(zip(fc_grads, variable_vars),
+                                                  global_step=net.global_iter_counter)
+    return tf.group(conv_tran_op, fc_tran_op)
+
+
 
 
 def training_convnet(net, loss_op, fc_lr, conv_lr, optimizer_type='adagrad', trace_gradients=False):

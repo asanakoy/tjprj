@@ -85,7 +85,7 @@ def fill_feed_dict_convnet(net, batch_loader, batch_size=128, phase='test'):
     return feed_dict
 
 
-def fill_feed_dict_magnet(net, batch_loader, batch_size=128, phase='test'):
+def fill_feed_dict_magnet(net, batch_loader, batch_size=128, max_cliques_per_batch=8, phase='test'):
 
     """Fills the feed_dict for training the given step.
 
@@ -117,6 +117,10 @@ def fill_feed_dict_magnet(net, batch_loader, batch_size=128, phase='test'):
     unq_y = np.unique(labels_feed)
     labels_feed_aux = np.where(np.tile(unq_y, (labels_feed.shape[0], 1)) == labels_feed.reshape(-1, 1))[1]
 
+    idxs_samples = np.where(labels_feed_aux < max_cliques_per_batch)[0]
+    assert idxs_samples.shape[0] > max_cliques_per_batch
+    images_feed = images_feed[idxs_samples, :, :, :]
+    labels_feed_aux = labels_feed_aux[idxs_samples]
     # TODO: remove after I fix BatchLoader. Presently BatchLoader outputs CxHxW images.
     images_feed = images_feed.transpose((0, 2, 3, 1))
 
@@ -124,7 +128,7 @@ def fill_feed_dict_magnet(net, batch_loader, batch_size=128, phase='test'):
         net.x: images_feed,
         net.y_gt: labels_feed_aux,
         net.fc6_keep_prob: keep_prob,
-        net.fc7_keep_prob: keep_prob,
+        # net.fc7_keep_prob: keep_prob,
         'input/is_phase_train:0': is_phase_train
     }
     return feed_dict

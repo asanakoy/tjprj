@@ -43,31 +43,32 @@ def load_net(snapshot_path, gpu_memory_fraction=None,
 
 
 if __name__ == '__main__':
-    category = 'long_jump'
+    category = ''
+
 
     mat_path = '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/OlympicSports/crops/' + category + '/images.mat'
     model_name = 'alexnet_joint_categories_begin'
 
+
+
     category = ''
     mean_path = join(
         '/export/home/asanakoy/workspace/OlympicSports/cnn/', model_name, category, 'mean.npy')
-    mean = np.load(mean_path)
+    # mean = np.load(mean_path)
 
     params = {
         'category': category,
         'layer_names': ['fc7'],
         'norm_method': None,
         'image_getter': ImageGetterFromMat(mat_path),
-        'mean': mean,
+        'mean': None,
         'im_shape': (227, 227),
         'batch_size': 256,
         'use_batch_norm': False,
         'gpu_memory_fraction': 0.35,
         'device_id': '/gpu:{}'.format(0)
     }
-    snapshot_path, sim_output_path = get_sim_pathes(model_name,
-                                                              iteration=170004,
-                                                              round_id=None,
+    snapshot_path, sim_output_path = get_sim_pathes(model_name,iteration=170004,round_id=None,
                                                               **params)
     net = load_net(snapshot_path, gpu_memory_fraction=0.4,
                    conv5='conv5/conv5',

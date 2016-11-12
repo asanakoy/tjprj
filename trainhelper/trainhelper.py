@@ -204,7 +204,7 @@ def get_params_clustering(dataset, category):
             'batch_size': 128,
             'nSamples': 8,
             'anchors': None,
-            'sampled_nbatches': 10000,
+            'sampled_nbatches': 100,
             'dataset': dataset,
             'category': category,
         }

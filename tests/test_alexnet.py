@@ -51,6 +51,9 @@ if __name__ == '__main__':
     correct_prediction = tf.equal(tf.cast(tf.argmax(net.prob, 1), tf.int32), net.y_gt)
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     net.sess.run(tf.initialize_all_variables())
+    saver = tf.train.Saver()
+    saver.save(net.sess, '/export/home/mbautist/tmp/alexnet-tf')
+    saver.restore(net.sess, '/export/home/mbautist/tmp/alexnet-tf')
 
     test_feed_forward(net)
 

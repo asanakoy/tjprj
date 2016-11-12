@@ -117,7 +117,7 @@ class Stlnet(object):
                                      name='fc_stl10')[0]
 
             # For training cliques
-            dropout_cliques = tf.nn.dropout(self.conv9, self.dropout_keep_prob,
+            dropout_cliques = tf.nn.dropout(self.conv11, self.dropout_keep_prob,
                                             name='dropout_cliques')
             self.fc_cliques = self.fc_relu(dropout_cliques,
                                            num_outputs=num_classes,
