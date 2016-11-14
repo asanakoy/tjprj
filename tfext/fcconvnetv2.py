@@ -5,7 +5,7 @@ import tensorflow.contrib.layers as tflayers
 from tfext.convnet import Convnet
 
 
-class FcConvnet(Convnet):
+class FcConvnetV2(Convnet):
     """
     Convnet
     WARNING! You should feed images in HxWxC BGR format!
@@ -18,6 +18,7 @@ class FcConvnet(Convnet):
 
     def __init__(self,
                  im_shape=(227, 227, 3),
+                 num_classes=1,
                  device_id='/gpu:0',
                  use_batch_norm=True,
                  random_init_type=RandomInitType.XAVIER_GAUSSIAN,
@@ -98,21 +99,30 @@ class FcConvnet(Convnet):
                                            padding='VALID',
                                            name='maxpool5')
 
-            self.fc6, fc6_relu = self.fc_relu(self.maxpool5,
+            self.fc6, self.fc6_relu = self.fc_relu(self.maxpool5,
                                     num_outputs=4096,
                                     relu=True,
+                                    batch_norm=use_batch_norm,
                                     weight_std=0.005, bias_init_value=0.1,
                                     name='fc6')
 
-            dropout6 = tf.nn.dropout(fc6_relu, self.dropout_keep_prob, name='dropout6')
+            dropout6 = tf.nn.dropout(self.fc6_relu, self.dropout_keep_prob, name='dropout6')
 
             self.fc7, fc7_relu = self.fc_relu(dropout6,
                                               num_outputs=4096,
                                               relu=True,
+                                              batch_norm=use_batch_norm,
                                               weight_std=0.005, bias_init_value=0.1,
                                               name='fc7')
             self.fc7_dropout = tf.nn.dropout(fc7_relu, self.dropout_keep_prob, name='dropout7')
-            self.reset_fc6_op = None
+
+            self.fc8 = self.fc_relu(self.fc7_dropout,
+                                    num_outputs=num_classes,
+                                    relu=False,
+                                    batch_norm=False,
+                                    weight_std=0.01, bias_init_value=0.0,
+                                    name='fc8')[0]
+        self.logits = self.fc8
 
         self.graph = tf.get_default_graph()
         assert not use_batch_norm or len(self.graph.get_collection(
@@ -138,17 +148,22 @@ class FcConvnet(Convnet):
                  will overwrite all variables and set them to initial state.
                  Call restore_from_snapshot() only after sess.run(tf.initialize_all_variables())!
         """
-        if num_layers != 5:
-            raise ValueError('You can restore only 5 layers')
+        if num_layers != 7 and num_layers != 5:
+            raise ValueError('You can restore only 5 or 7 layers')
         if num_layers == 0:
-            print 'Not restoring anything'
+            print 'FcConvnetV2::Not restoring anything'
             return
 
         with self.graph.as_default():
             vars_to_restore = tf.get_collection(tf.GraphKeys.VARIABLES, "conv")
             if restore_iter_counter:
                 vars_to_restore.append(self.global_iter_counter)
-            print 'FcConvnet::Restoring 5 layers:', [v.name for v in vars_to_restore]
+            if num_layers == 7:
+                vars_to_restore += tf.get_collection(tf.GraphKeys.VARIABLES, "fc6") + \
+                                   tf.get_collection(tf.GraphKeys.VARIABLES, "fc7")
+
+            print 'FcConvnetV2::Restoring {} layers:'.format(num_layers), \
+                [v.name for v in vars_to_restore]
             saver = tf.train.Saver(vars_to_restore)
             saver.restore(self.sess, snapshot_path)
 

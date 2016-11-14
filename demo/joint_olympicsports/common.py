@@ -10,29 +10,41 @@ import gc
 from tfext import network_spec
 import tfext.alexnet
 import tfext.convnet
+import tfext.fcconvnetv2
 import tfext.utils
 from trainhelper import trainhelper
 import batch_loader_with_prefetch
 import eval.olympicsports.roc.roc_from_net
 import eval.olympicsports.utils
-from helper import CATEGORIES
+import helper
 from helper import BatchManager
 from tqdm import tqdm
 import pickle
 
 
-def get_num_classes(indices_path):
-    # TODO:
-    mat_data = h5py.File(indices_path, 'r')
-    if 'labels' in mat_data.keys():
-        num_cliques = int(np.array(mat_data['labels']).max() + 1)
-    else:
-        num_cliques = int(np.array(mat_data['new_labels']).max() + 1)
-    return num_cliques
-
-
 def get_first_model_path():
     return '/export/home/asanakoy/workspace/tfprj/data/bvlc_alexnet.npy'
+
+
+def training_one_layer(net, loss_op, layer_name, lr, optimizer_type='adagrad'):
+    with net.graph.as_default():
+        print('Creating optimizer {}'.format(optimizer_type))
+        if optimizer_type == 'adagrad':
+            optimizer = tf.train.AdagradOptimizer(lr, initial_accumulator_value=0.0001)
+        elif optimizer_type == 'sgd':
+            optimizer = tf.train.GradientDescentOptimizer(lr)
+        elif optimizer_type == 'momentum':
+            optimizer = tf.train.MomentumOptimizer(lr, momentum=0.9)
+        else:
+            raise ValueError('Unknown optimizer type {}'.format(optimizer_type))
+
+        layer_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, layer_name)
+        grads = tf.gradients(loss_op, layer_vars)
+
+        train_op = optimizer.apply_gradients(zip(grads, layer_vars),
+                                                  global_step=net.global_iter_counter,
+                                                  name='last_layer_train_op')
+        return train_op
 
 
 def run_reclustering(**params_clustering):
@@ -46,15 +58,14 @@ def run_reclustering(**params_clustering):
     from clustering.batchsampler import BatchSampler
     generator = BatchGenerator(**params_clustering)
     init_batches = generator.generateBatches(params_clustering['init_nbatches'])
-    params_clustering['batches'] = init_batches
-    params_clustering['sampler'] = BatchSampler(**params_clustering)
-    params_clustering['sampler'].updateCliqueSampleProb(
-        np.ones(len(params_clustering['sampler'].cliques)))
+    sampler = BatchSampler(batches=init_batches, **params_clustering)
+    sampler.updateCliqueSampleProb(
+        np.ones(len(sampler.cliques)))
 
     # # Save batchsampler
     sampler_file = open(os.path.join(params_clustering['output_dir'], 'sampler_round_' + str(
         params_clustering['clustering_round']) + '.pkl'), 'wb')
-    pickle.dump(params_clustering['sampler'].cliques, sampler_file, pickle.HIGHEST_PROTOCOL)
+    pickle.dump(sampler.cliques, sampler_file, pickle.HIGHEST_PROTOCOL)
     sampler_file.close()
 
     indices = np.empty(0, dtype=np.int64)
@@ -63,11 +74,11 @@ def run_reclustering(**params_clustering):
     print 'Sampling batches'
     for i in tqdm(range(params_clustering['sampled_nbatches'])):
         # print "Sampling batch {}".format(i)
-        batch = params_clustering['sampler'].sampleBatch(params_clustering['batch_size'],
-                                                         params_clustering[
-                                                             'max_cliques_per_batch'],
-                                                         mode='random')
-        _x, _f, _y = params_clustering['sampler'].parse_to_list(batch)
+        batch = sampler.sampleBatch(params_clustering['batch_size'],
+                                     params_clustering['max_cliques_per_batch'],
+                                     mode='random')
+        _x, _f, _y = sampler.parse_to_list(batch)
+        assert len(_x) == len(_f) == len(_y) == params_clustering['batch_size']
         indices = np.append(indices, _x.astype(dtype=np.int64))
         flipped = np.append(flipped, _f.astype(dtype=np.bool))
         label = np.append(label, _y.astype(dtype=np.int64))
@@ -77,22 +88,47 @@ def run_reclustering(**params_clustering):
     return {'idxs': indices, 'flipvals': flipped, 'labels': label}, params_clustering
 
 
-def setup_alexnet_network(num_classes, snapshot_path_to_restore=None, **params):
+def set_summary_tracking(graph, track_moving_averages):
+    with graph.as_default():
+        if track_moving_averages:
+            movin_avg_vars = [v for v in tf.get_collection(tf.GraphKeys.VARIABLES) if 'moving_' in v.name]
+            tf.scalar_summary(['moving/' + v.name for v in movin_avg_vars],
+                              [tf.nn.l2_loss(v) for v in movin_avg_vars])
+
+
+def create_loss_op(net, loss_type):
+    if loss_type not in ['clique', 'soft_xe']:
+        raise ValueError('Unknown loss_type: {}'.format(loss_type))
+    if loss_type == 'soft_xe':
+        print 'Creating soft XE loss'
+        features_normed = tf.nn.l2_normalize(net.fc7, dim=1, name='normalized_features')
+        _, labels = tf.unique(net.y_gt, name='unique_labels')
+        loss_op = tfext.network_spec.soft_xe(features_normed, labels, alpha=1.0, num_classes_in_batch=8, sess=None)
+    else:
+        loss_op = tfext.network_spec.loss(net.logits, net.y_gt)
+    return loss_op
+
+
+def setup_alexnet_network(num_classes, loss_type, batch_size, optimizer_type,
+                          snapshot_path_to_restore=None, net_params=None):
     print 'Setup Alexnet'
-    net = tfext.alexnet.Alexnet(num_classes=num_classes, **params)
+    net = tfext.alexnet.Alexnet(num_classes=num_classes, **net_params)
     with tf.variable_scope('lr'):
         conv_lr_pl = tf.placeholder(tf.float32, tuple(), name='conv_lr')
         fc_lr_pl = tf.placeholder(tf.float32, tuple(), name='fc_lr')
 
-    loss_op = network_spec.loss(net.logits, net.y_gt)
+    loss_op = create_loss_op(net, loss_type=loss_type)
     train_op = network_spec.training_convnet(net, loss_op,
                                              fc_lr=fc_lr_pl,
-                                             conv_lr=conv_lr_pl)
+                                             conv_lr=conv_lr_pl,
+                                             optimizer_type=optimizer_type)
+    if loss_type != 'soft_xe':
+        training_one_layer(net, loss_op, 'fc8', fc_lr_pl)
 
     # Add the Op to compare the logits to the labels during correct_classified_top1.
     eval_correct_top1 = network_spec.correct_classified_top1(net.logits, net.y_gt)
     accuracy = tf.cast(eval_correct_top1, tf.float32) / \
-               tf.constant(params['batch_size'], dtype=tf.float32)
+               tf.constant(batch_size, dtype=tf.float32)
 
     saver = tf.train.Saver()
 
@@ -108,18 +144,22 @@ def setup_alexnet_network(num_classes, snapshot_path_to_restore=None, **params):
     return net, train_op, loss_op, saver
 
 
-def setup_convnet_network(num_classes, snapshot_path_to_restore=None, **params):
+def setup_convnet_network(network_class, num_classes, loss_type, batch_size,
+                          optimizer_type, snapshot_path_to_restore=None, net_params=None):
     print 'Setup Convnet'
-    net = tfext.convnet.Convnet(num_classes=num_classes, **params)
+    if network_class not in [tfext.convnet.Convnet, tfext.fcconvnetv2.FcConvnetV2]:
+        raise ValueError('Unknown network')
+
+    net = network_class(num_classes=num_classes, **net_params)
     with tf.variable_scope('lr'):
         conv_lr_pl = tf.placeholder(tf.float32, tuple(), name='conv_lr')
         fc_lr_pl = tf.placeholder(tf.float32, tuple(), name='fc_lr')
-    loss_op = network_spec.loss(net.logits, net.y_gt)
+    loss_op = create_loss_op(net, loss_type=loss_type)
 
     # Add the Op to compare the logits to the labels during correct_classified_top1.
     eval_correct_top1 = network_spec.correct_classified_top1(net.logits, net.y_gt)
     accuracy = tf.cast(eval_correct_top1, tf.float32) / \
-               tf.constant(params['batch_size'], dtype=tf.float32)
+               tf.constant(batch_size, dtype=tf.float32)
 
     saver = tf.train.Saver()
 
@@ -131,17 +171,23 @@ def setup_convnet_network(num_classes, snapshot_path_to_restore=None, **params):
     net.sess.run(tf.initialize_all_variables())
     # init with alexnet if necessary
     net.restore_from_alexnet_snapshot(trainhelper.get_alexnet_snapshot_path(),
-                                      params['num_layers_to_init'])
+                                      net_params['num_layers_to_init'])
     if snapshot_path_to_restore is not None:
-        print('Restoring 5 layers from snapshot {}'.format(snapshot_path_to_restore))
-        net.restore_from_snapshot(snapshot_path_to_restore, 5)
+        if network_class == tfext.convnet.Convnet:
+            num_layers_to_restore = 5
+        else:
+            num_layers_to_restore = 7
+        print('Restoring {} layers from snapshot {}'.format(num_layers_to_restore, snapshot_path_to_restore))
+        net.restore_from_snapshot(snapshot_path_to_restore, num_layers_to_restore, restore_iter_counter=True)
 
-    optimizer_type = 'adagrad'
     train_op = network_spec.training_convnet(net, loss_op,
                                              fc_lr=fc_lr_pl,
                                              conv_lr=conv_lr_pl,
                                              optimizer_type=optimizer_type,
                                              trace_gradients=True)
+    last_layer_name = 'fc6' if network_class == tfext.convnet.Convnet else 'fc8'
+    training_one_layer(net, loss_op, last_layer_name, fc_lr_pl)
+
     uninit_vars = [v for v in tf.all_variables()
                    if not tf.is_variable_initialized(v).eval(session=net.sess)]
     print 'uninit vars:', [v.name for v in uninit_vars]
@@ -164,6 +210,7 @@ def eval_net(net, category, layer_names, mat_path, mean_path):
 
 
 def eval_all_cat(net, step, global_step, summary_writer, params):
+    CATEGORIES = params['categories']
     aucs = {key: list() for key in params['test_layers']}
     for category in CATEGORIES:
         cur_cat_roc_dict = eval_net(net, category, params['test_layers'],
@@ -177,12 +224,16 @@ def eval_all_cat(net, step, global_step, summary_writer, params):
                 tfext.utils.create_sumamry(
                     '{}ROCAUC_{}'.format(layer_name, category), auc),
                 global_step=global_step)
+    scores = dict()
     for layer_name, auc_list in aucs.iteritems():
+        cur_layer_mean = np.mean(auc_list)
+        scores[layer_name] = cur_layer_mean
         summary_writer.add_summary(
             tfext.utils.create_sumamry('m{}ROCAUC'.format(layer_name),
-                                       np.mean(auc_list)),
+                                       cur_layer_mean),
             global_step=global_step)
     summary_writer.flush()
+    return scores
 
 
 def run_training_current_clustering(net, batch_manager, train_op, loss_op,
@@ -190,16 +241,38 @@ def run_training_current_clustering(net, batch_manager, train_op, loss_op,
     log_step = 1
     summary_step = 50
 
-    summary_writer = tf.train.SummaryWriter(params['output_dir'], net.sess.graph)
-    summary_op = tf.merge_all_summaries()
+    with net.graph.as_default():
+        summary_writer = tf.train.SummaryWriter(params['output_dir'], net.sess.graph)
+        summary_op = tf.merge_all_summaries()
+        fc_train_op = net.graph.get_operation_by_name('fc_train_op')
+        try:
+            last_layer_train_op = net.graph.get_operation_by_name('last_layer_train_op')
+        except KeyError:
+            last_layer_train_op = None
+
+    best_scores = {key: 0.0 for key in params['test_layers']}
 
     for step in xrange(params['max_iter'] + 1):
 
         # test, snapshot
         if step == 1 or step % params['test_step'] == 0 or step + 1 == params['max_iter']:
             global_step = net.sess.run(net.global_iter_counter)
-            eval_all_cat(net, step, global_step, summary_writer, params)
-        if step % params['snapshot_iter'] == 0 and step > 1:
+            scores = eval_all_cat(net, step, global_step, summary_writer, params)
+            if params['snapshot_iter'] == 'save_the_best':
+                should_save_snapshot = False
+                for layer_name, layer_auc in scores.iteritems():
+                    if layer_auc - best_scores[layer_name] >= 0.001:
+                        print 'FOUND THE BEST SCORE of layer {}!'.format(layer_name)
+                        best_scores[layer_name] = layer_auc
+                        should_save_snapshot = True
+                        open(os.path.join(params['output_dir'],
+                             '{}_{:.3f}_iter-{}'.format(layer_name, layer_auc, global_step)), mode='w').close()
+                if should_save_snapshot:
+                    checkpoint_prefix = os.path.join(params['output_dir'], 'checkpoint')
+                    saver.save(net.sess, checkpoint_prefix, global_step=global_step)
+
+        if params['snapshot_iter'] != 'save_the_best' and \
+                step % params['snapshot_iter'] == 0 and step > 0:
             checkpoint_prefix = os.path.join(params['output_dir'], 'checkpoint')
             saver.save(net.sess, checkpoint_prefix, global_step=global_step)
         if step == params['max_iter']:
@@ -214,17 +287,24 @@ def run_training_current_clustering(net, batch_manager, train_op, loss_op,
         else:
             feed_dict['lr/conv_lr:0'] = 0.0
 
-        if step % summary_step == 0:
+        if step < params['fix_up_to_the_last']:
+            cur_train_op = last_layer_train_op
+        elif step < params.get('only_fc_train_op_iter', 0):
+            cur_train_op = fc_train_op
+        else:
+            cur_train_op = train_op
+
+        if step % summary_step == 0 or step + 1 == params['max_iter'] or step % params['test_step'] == 0:
             global_step, summary_str, _, loss_value = net.sess.run(
                 [net.global_iter_counter,
                  summary_op,
-                 train_op,
+                 cur_train_op,
                  loss_op],
                 feed_dict=feed_dict)
             summary_writer.add_summary(summary_str, global_step=global_step)
         else:
             global_step, _, loss_value = net.sess.run(
-                [net.global_iter_counter, train_op, loss_op],
+                [net.global_iter_counter, cur_train_op, loss_op],
                 feed_dict=feed_dict)
 
         duration = time.time() - start_time
@@ -235,14 +315,12 @@ def run_training_current_clustering(net, batch_manager, train_op, loss_op,
                      params['batch_size'] / duration))
 
 
-def cluster_category(clustering_round, category, output_dir, params_clustering):
+def cluster_category(clustering_round, recluster_on_init_sim, category, output_dir, params_clustering, seed):
     # Delete old batch_ldr, recompute clustering and create new batch_ldr
     # Use HOGLDA for initial estimate of similarities
     # Just recluster on the HOGLDA sim every round
     print('Clustering %s' % category)
-    # TODO: use RandomState with seed inside clustering
-    np.random.seed(None)
-    matrices = trainhelper.get_step_similarities(step=0,
+    matrices = trainhelper.get_step_similarities(step=0 if recluster_on_init_sim else clustering_round,
                                                  net=None,
                                                  category=category,
                                                  dataset='OlympicSports',
@@ -256,14 +334,21 @@ def cluster_category(clustering_round, category, output_dir, params_clustering):
     params_clustering['clustering_round'] = clustering_round
     params_clustering['output_dir'] = output_dir
     # TODO: maybe recluster next round not on anchors
-    index_dict, _ = run_reclustering(**params_clustering)
+    if seed is not None:
+        seed += clustering_round
+    index_dict, _ = run_reclustering(seed=seed, **params_clustering)
     return index_dict
 
 
 def run_training(**params):
     net = None
+    CATEGORIES = params.setdefault('categories', helper.ALL_CATEGORIES)
+    params.setdefault('loss_type', 'clique')
+    params.setdefault('optimizer_type', 'adagrad')
+    params.setdefault('reset_iter_counter', False)
+    params.setdefault('recluster_on_init_sim', True)
     checkpoint_prefix = os.path.join(params['output_dir'], 'round_checkpoint')
-    eval.olympicsports.utils.get_joint_categories_mean(params['mean_filepath'])
+    eval.olympicsports.utils.get_joint_categories_mean(params['mean_filepath'], CATEGORIES)
     assert os.path.exists(params['mean_filepath'])
 
     for clustering_round in range(0, params['num_clustering_rounds']):
@@ -278,9 +363,11 @@ def run_training(**params):
             else:
                 params_clustering['init_nbatches'] = params['init_nbatches']
             index_dict = cluster_category(clustering_round,
-                                          cat,
-                                          params['output_dir'],
-                                          params_clustering)
+                                          recluster_on_init_sim=params['recluster_on_init_sim'],
+                                          category=cat,
+                                          output_dir=params['output_dir'],
+                                          params_clustering=params_clustering,
+                                          seed=params['seed'])
             index_dict['labels'] = np.asarray(index_dict['labels']) + num_classes
             num_classes = index_dict['labels'].max() + 1
 
@@ -295,33 +382,52 @@ def run_training(**params):
                                      params['batch_size'],
                                      params['im_shape'][:2],
                                      network=params['network'],
+                                     categories=CATEGORIES,
                                      random_shuffle=params['random_shuffle_categories'],
                                      random_seed=params['seed'])
         # Create network with new clustering parameters
         # If a network exists close session and reset graph
         if net is not None:
             net.sess.close()
-        tf.reset_default_graph()
+            # with net.graph.as_default():
+            #     tf.reset_default_graph()
         if clustering_round == 0:
             snapshot_path_to_restore = params.pop('snapshot_path_to_restore')
         else:
             snapshot_path_to_restore = None
             assert 'snapshot_path_to_restore' not in params
-        if params['network'] == tfext.alexnet.Alexnet:
-            net, train_op, loss_op, saver = setup_alexnet_network(
-                num_classes,
-                snapshot_path_to_restore=snapshot_path_to_restore,
-                **params)
-        else:
-            net, train_op, loss_op, saver = setup_convnet_network(
-                num_classes,
-                snapshot_path_to_restore=snapshot_path_to_restore,
-                **params)
+
+        with tf.Graph().as_default():
+            if params['network'] == tfext.alexnet.Alexnet:
+                net, train_op, loss_op, saver = setup_alexnet_network(
+                    num_classes,
+                    params['loss_type'],
+                    params['batch_size'],
+                    optimizer_type=params['optimizer_type'],
+                    snapshot_path_to_restore=snapshot_path_to_restore,
+                    net_params=params)
+            elif params['network'] == tfext.convnet.Convnet or params['network'] == tfext.fcconvnetv2.FcConvnetV2:
+                net, train_op, loss_op, saver = setup_convnet_network(
+                    params['network'],
+                    num_classes,
+                    params['loss_type'],
+                    params['batch_size'],
+                    optimizer_type=params['optimizer_type'],
+                    snapshot_path_to_restore=snapshot_path_to_restore,
+                    net_params=params)
+            else:
+                raise ValueError('Unknown network')
+            if clustering_round == 0 and params['reset_iter_counter']:
+                tf.initialize_variables([net.global_iter_counter])
+
+        set_summary_tracking(net.graph, track_moving_averages=params.get('track_moving_averages', False))
 
         # Restore from previous round model
         if clustering_round > 0:
             checkpoint_path = checkpoint_prefix + '-' + str(clustering_round)
-            num_layers_to_restore = 7 if params['network'] == tfext.alexnet.Alexnet else 5
+            num_layers_to_restore = 7 if \
+                params['network'] == tfext.alexnet.Alexnet or \
+                params['network'] == tfext.fcconvnetv2.FcConvnetV2 else 5
             net.restore_from_snapshot(checkpoint_path, num_layers_to_restore, restore_iter_counter=True)
 
         with net.graph.as_default():

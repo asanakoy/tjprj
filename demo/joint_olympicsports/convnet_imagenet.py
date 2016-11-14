@@ -12,14 +12,14 @@ import pprint
 import tfext.alexnet
 import tfext.convnet
 import tfext.utils
-from helper import CATEGORIES
+from helper import ALL_CATEGORIES
 from common import run_training, get_first_model_path
 
 
 def get_pathes(is_bbox_sq):
     assert not is_bbox_sq
     images_mat_pathes = {cat: '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/OlympicSports/crops/{}/images.mat'.format(
-                        cat) for cat in CATEGORIES}
+                        cat) for cat in ALL_CATEGORIES}
 
     output_dir = os.path.expanduser('/export/home/asanakoy/workspace/OlympicSports/cnn/convnet_joint_categories_imagenet')
     # output_dir = os.path.join(os.path.expanduser('~/tmp/tf_test'))

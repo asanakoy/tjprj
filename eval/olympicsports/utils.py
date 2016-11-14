@@ -12,7 +12,7 @@ def get_num_classes(indices_path):
     return num_cliques
 
 
-def get_joint_categories_mean(output_path, image_shape=(227, 227)):
+def get_joint_categories_mean(output_path, categories, image_shape=(227, 227)):
     """
     Compute save and return mean in HxWxC and RGB
     """
@@ -22,23 +22,6 @@ def get_joint_categories_mean(output_path, image_shape=(227, 227)):
 
     if os.path.exists(output_path):
         return np.load(output_path)
-
-    categories = ['basketball_layup',
-                  'bowling',
-                  'clean_and_jerk',
-                  'discus_throw',
-                  'diving_platform_10m',
-                  'diving_springboard_3m',
-                  'hammer_throw',
-                  'high_jump',
-                  'javelin_throw',
-                  'long_jump',
-                  'pole_vault',
-                  'shot_put',
-                  'snatch',
-                  'tennis_serve',
-                  'triple_jump',
-                  'vault']
 
     'Calculating mean for the images...'
     mean_img = np.zeros((image_shape[0], image_shape[1], 3), dtype=np.float64)

@@ -4,6 +4,8 @@ import numpy as np
 import h5py
 import scipy.interpolate
 import scipy.io
+import hdf5storage
+import deepdish.io as dio
 import sklearn.metrics as sklm
 import os
 import glob
@@ -53,7 +55,7 @@ def get_pr_auc(labels, scores, pos_class=1):
 
 def get_roc_auc(labels, scores, pos_class=1):
     labels_gt = labels == pos_class
-    fpr, tpr, _ = sklm.roc_curve(labels_gt, scores, pos_label=pos_class)
+    fpr, tpr, thresholds = sklm.roc_curve(labels_gt, scores, pos_label=pos_class)
     roc_auc = sklm.auc(fpr, tpr, reorder=True)
     return roc_auc, fpr, tpr
 
@@ -123,7 +125,11 @@ def compute_roc_auc_from_sim(argv, path_sim_matrix=None, is_quiet=False):
                                    category, suffix + '_' if len(suffix) else '', iter_id))
     if not is_quiet:
         print 'Sim matrix path:', path_sim_matrix
-    sim = scipy.io.loadmat(path_sim_matrix)
+    try:
+        sim = scipy.io.loadmat(path_sim_matrix)
+    except NotImplementedError:
+        # matlab v7.3 file
+        sim = dio.load(path_sim_matrix)
 
     labels_path = join(dataset_root,
                        'dataset_labeling/labels_hdf5_19.02.16/labels_{}.hdf5'.format(

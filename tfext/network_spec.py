@@ -366,7 +366,8 @@ def training_warmup_stl(net, loss_op, lower_lr, upper_lr):
 
 
 
-def training_convnet(net, loss_op, fc_lr, conv_lr, optimizer_type='adagrad', trace_gradients=False):
+def training_convnet(net, loss_op, fc_lr, conv_lr, optimizer_type='adagrad',
+                     trace_gradients=False):
     with net.graph.as_default():
         print('Creating optimizer {}'.format(optimizer_type))
         if optimizer_type == 'adagrad':
@@ -408,9 +409,8 @@ def training_convnet(net, loss_op, fc_lr, conv_lr, optimizer_type='adagrad', tra
 
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
-            conv_tran_op = conv_optimizer.apply_gradients(zip(conv_grads, conv_vars))
-            fc_tran_op = fc_optimizer.apply_gradients(zip(fc_grads, fc_vars),
-                                                      global_step=net.global_iter_counter)
+            conv_tran_op = conv_optimizer.apply_gradients(zip(conv_grads, conv_vars), name='conv_train_op')
+        fc_tran_op = fc_optimizer.apply_gradients(zip(fc_grads, fc_vars), global_step=net.global_iter_counter, name='fc_train_op')
         return tf.group(conv_tran_op, fc_tran_op)
 
 

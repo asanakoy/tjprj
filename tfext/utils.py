@@ -45,7 +45,6 @@ def fill_feed_dict(net, batch_loader, batch_size=128, phase='test'):
     return feed_dict
 
 
-
 def fill_feed_dict_convnet(net, batch_loader, batch_size=128, phase='test'):
     """Fills the feed_dict for training the given step.
 

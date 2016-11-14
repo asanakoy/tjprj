@@ -115,7 +115,7 @@ class Convnet(object):
             config.gpu_options.per_process_gpu_memory_fraction = gpu_memory_fraction
         self.sess = tf.Session(config=config)
 
-    def restore_from_snapshot(self, snapshot_path, num_layers, restore_iter_counter=True):
+    def restore_from_snapshot(self, snapshot_path, num_layers, restore_iter_counter=False):
         """
         :param snapshot_path: path to the snapshot file
         :param num_layers: number layers to restore from the snapshot
@@ -129,9 +129,8 @@ class Convnet(object):
         if num_layers > 6 or num_layers < 5:
             raise ValueError('You can restore only 5 or 6 layers.')
         if num_layers == 0:
+            print 'Convnet::Not restoring anything'
             return
-        if not restore_iter_counter:
-            raise ValueError('We can restore only everything including iter_counter')
 
         with self.graph.as_default():
             if num_layers == 5:
@@ -139,9 +138,15 @@ class Convnet(object):
                 fc6_vars = tf.get_collection(tf.GraphKeys.VARIABLES, "fc6")
                 vars_to_restore = tf.get_collection(tf.GraphKeys.VARIABLES)
                 vars_to_restore = [x for x in vars_to_restore if x not in fc6_vars]
+                if restore_iter_counter:
+                    vars_to_restore.append(self.global_iter_counter)
+                print 'Convnet::Restoring 5 layers:', [v.name for v in vars_to_restore]
                 saver = tf.train.Saver(vars_to_restore)
             else:
+                print 'Convnet::Restoring Everything (6 layers)'
                 saver = tf.train.Saver()
+                if not restore_iter_counter:
+                    tf.initialize_variables(self.global_iter_counter)
             saver.restore(self.sess, snapshot_path)
 
     def restore_from_alexnet_snapshot(self, snapshot_path, num_layers):
@@ -254,9 +259,11 @@ class Convnet(object):
             conv = tf.nn.relu(conv, name=name)
         return conv
 
-    def fc_relu(self, input_tensor, num_outputs, relu=False, weight_std=0.005,
+    def fc_relu(self, input_tensor, num_outputs, relu=False, batch_norm=False, weight_std=0.005,
                 bias_init_value=0.1, name=None):
-        with tf.variable_scope(name):
+        if batch_norm and not relu:
+            raise ValueError('Cannot use batch normalization without following RELU')
+        with tf.variable_scope(name) as scope:
             num_inputs = int(np.prod(input_tensor.get_shape()[1:]))
             w, b = self.get_fc_weights(num_inputs, num_outputs,
                                        weight_std=weight_std,
@@ -264,9 +271,21 @@ class Convnet(object):
 
             fc_relu = None
             input_tensor_reshaped = tf.reshape(input_tensor, [-1, num_inputs])
+            fc = tf.add(tf.matmul(input_tensor_reshaped, w), b, name='fc' if relu or batch_norm else name)
+            if batch_norm:
+                fc = tf.cond(self.is_phase_train,
+                             lambda: tflayers.batch_norm(fc,
+                                                           decay=self.batch_norm_decay,
+                                                           is_training=True,
+                                                           trainable=True,
+                                                           reuse=None,
+                                                           scope=scope),
+                              lambda: tflayers.batch_norm(fc,
+                                                           decay=self.batch_norm_decay,
+                                                           is_training=False,
+                                                           trainable=True,
+                                                           reuse=True,
+                                                           scope=scope))
             if relu:
-                fc = tf.add(tf.matmul(input_tensor_reshaped, w), b, name='fc')
                 fc_relu = tf.nn.relu(fc, name=name)
-            else:
-                fc = tf.add(tf.matmul(input_tensor_reshaped, w), b, name=name)
         return fc, fc_relu

@@ -3,22 +3,22 @@ import multiprocessing as mp
 import ctypes
 import tfext.alexnet
 
-CATEGORIES = ['basketball_layup',
-              'bowling',
-              'clean_and_jerk',
-              'discus_throw',
-              'diving_platform_10m',
-              'diving_springboard_3m',
-              'hammer_throw',
-              'high_jump',
-              'javelin_throw',
-              'long_jump',
-              'pole_vault',
-              'shot_put',
-              'snatch',
-              'tennis_serve',
-              'triple_jump',
-              'vault']
+ALL_CATEGORIES = ['basketball_layup',
+                  'bowling',
+                  'clean_and_jerk',
+                  'discus_throw',
+                  'diving_platform_10m',
+                  'diving_springboard_3m',
+                  'hammer_throw',
+                  'high_jump',
+                  'javelin_throw',
+                  'long_jump',
+                  'pole_vault',
+                  'shot_put',
+                  'snatch',
+                  'tennis_serve',
+                  'triple_jump',
+                  'vault']
 
 # CATEGORIES = ['snatch', 'vault']
 
@@ -37,14 +37,17 @@ class BatchWorker(mp.Process):
 
 
 class BatchManager(object):
-    def __init__(self, batch_loaders, batch_size, image_shape, network, random_shuffle=True,
+    def __init__(self, batch_loaders, batch_size, image_shape, network,
+                 categories, random_shuffle=True,
                  random_seed=None):
-        if len(batch_loaders) != len(CATEGORIES):
+        if len(categories) == 0:
+            raise ValueError('No categories found')
+        if len(batch_loaders) != len(categories):
             raise ValueError
         if len(image_shape) != 2:
             raise ValueError('Image shape must be a pair (h, w)')
 
-        self.num_categories = len(CATEGORIES)
+        self.num_categories = len(categories)
         self.batch_loaders = batch_loaders
         self.batch_size = batch_size
         self.network = network
@@ -64,6 +67,7 @@ class BatchManager(object):
 
         self.images = np.zeros(images_arr_shape, dtype=np.float32)
         self.labels = np.zeros(num_labels, dtype=np.int32)
+        self.__fetch_category_batches()
 
     def __fetch_category_batches(self):
         assert self._cur_batch_num == 0

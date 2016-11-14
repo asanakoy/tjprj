@@ -1,10 +1,4 @@
-# Original work Copyright 2015 The TensorFlow Authors. Licensed under the Apache License v2.0 http://www.apache.org/licenses/LICENSE-2.0
-# Modified work Copyright (c) 2016 Artsiom Sanakoyeu
-
-# pylint: disable=missing-docstring
-# from __future__ import absolute_import
-from __future__ import division
-
+# Copyright (c) 2016 Artsiom Sanakoyeu
 import os.path
 import time
 import sys
@@ -12,14 +6,14 @@ import pprint
 import tfext.alexnet
 import tfext.convnet
 import tfext.utils
-from helper import CATEGORIES
+from helper import ALL_CATEGORIES
 from common import run_training, get_first_model_path
 
 
 def get_pathes(is_bbox_sq):
     assert not is_bbox_sq
     images_mat_pathes = {cat: '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/OlympicSports/crops/{}/images.mat'.format(
-                        cat) for cat in CATEGORIES}
+                        cat) for cat in ALL_CATEGORIES}
 
     output_dir = os.path.expanduser('/export/home/asanakoy/workspace/OlympicSports/cnn/alexnet_joint_categories')
     # output_dir = os.path.join(os.path.expanduser('~/tmp/tf_test'))
@@ -38,17 +32,18 @@ def main(argv):
         'batch_size': 128,
         'fc_lr': 0.001,
         'conv_lr': 0.0001,
-        'fix_conv_iter': 10000,
+        'fix_conv_iter': 20000,
+        'only_fc_train_op_iter': 20000,
 
-        'test_layers': ['maxpool5', 'fc6', 'fc7'],
-        'snapshot_path_to_restore': '/export/home/asanakoy/workspace/OlympicSports/cnn/alexnet_joint_categories_begin/checkpoint-325004',
+        'test_layers': ['maxpool5', 'fc6', 'fc7', 'fc8'],
+        'snapshot_path_to_restore': '/export/home/asanakoy/workspace/OlympicSports/cnn/alexnet_joint_categories/checkpoint-445004',
         'init_model': get_first_model_path(),
         'num_layers_to_init': 0,
         'network': tfext.alexnet.Alexnet,
 
-        'max_iter': 50000,
-        'snapshot_iter': 10000,
-        'test_step': 5000,
+        'max_iter': 25000,
+        'snapshot_iter': 2500,
+        'test_step': 2500,
         'num_clustering_rounds': 200,
         'init_nbatches': 110,
 
@@ -63,7 +58,7 @@ def main(argv):
         'online_augmentations': True,
         'async_preload': False,
         'num_data_workers': 1,
-        'gpu_memory_fraction': 0.9,
+        'gpu_memory_fraction': 0.45,
         'augmenter_params': dict(hflip=False, vflip=False,
                                  scale_to_percent=(1.0, 2 ** 0.5),
                                  scale_axis_equally=True,
