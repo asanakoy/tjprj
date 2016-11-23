@@ -7,6 +7,7 @@ from scipy.misc import imread, imresize
 import tensorflow as tf
 import tfext.convnet
 from trainhelper import trainhelper
+import tfext.network_spec
 
 MODELS_DIR = '/export/home/asanakoy/workspace/tfprj/data'
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
@@ -43,20 +44,24 @@ if __name__ == '__main__':
     with net.graph.as_default():
         cross_entropy = tf.reduce_mean(
             tf.nn.sparse_softmax_cross_entropy_with_logits(net.fc6, net.y_gt))
-        update_ops = net.graph.get_collection(tf.GraphKeys.UPDATE_OPS)
-        assert len(update_ops) > 0
-        with tf.control_dependencies(update_ops):
-            train_step = tf.train.AdagradOptimizer(learning_rate=1e-4,
-                                                   initial_accumulator_value=0.00001).minimize(cross_entropy, global_step=net.global_iter_counter)
-            # train_step = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(cross_entropy,
-            #                                                                      global_step=net.global_iter_counter)
+        # update_ops = net.graph.get_collection(tf.GraphKeys.UPDATE_OPS)
+        # assert len(update_ops) > 0
+        # with tf.control_dependencies(update_ops):
+        #     train_step = tf.train.AdagradOptimizer(learning_rate=1e-4,
+        #                                            initial_accumulator_value=0.00001).minimize(cross_entropy, global_step=net.global_iter_counter)
+        #     # train_step = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(cross_entropy,
+        #     #                                                                      global_step=net.global_iter_counter)
+        tfext.network_spec.training_convnet(net, cross_entropy, 1e-4, 1e-4,
+                                                         optimizer_type='adagrad', trace_gradients=False)
+
+        train_step = net.graph.get_operation_by_name('fc_train_op')
         correct_prediction = tf.equal(tf.cast(tf.argmax(net.prob, 1), tf.int32), net.y_gt)
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-
     net.sess.run(tf.initialize_all_variables())
 
     saver = tf.train.Saver()
     net.restore_from_alexnet_snapshot(trainhelper.get_alexnet_snapshot_path(), 5)
+
 
 
     test_feed_forward(net, params['im_shape'])

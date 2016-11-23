@@ -35,8 +35,10 @@ def compute_roc_auc_from_net(net, category, layer_names,
     if mat_path is None:
         mat_path = '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/OlympicSports/crops/' + category + '/images_test.mat'
     if mean_path is None:
-        mean_path = join(
-            '/export/home/mbautist/Desktop/workspace/cnn_similarities/data/mat_files/cliqueCNN/' + category + '_batch_128_10trans_shuffleMB1shuffleALL_0/mat/mean.npy')
+        print 'No mean subtraction.'
+        mean = None
+    else:
+        mean = np.load(mean_path)
     labels_path = join(
         '/export/home/asanakoy/workspace/OlympicSports/dataset_labeling/labels_hdf5_19.02.16/labels_{}.hdf5'.format(
             category))
@@ -57,7 +59,7 @@ def compute_roc_auc_from_net(net, category, layer_names,
     feats_params = {
         'category': category,
         'layer_names': layer_names,
-        'mean': np.load(mean_path),
+        'mean': mean,
         'batch_size': batch_size,
         'im_shape': (227, 227),
         'image_getter': eval.image_getter.ImageGetterFromMat(mat_path, load_all_in_memory=load_all_in_memory)
