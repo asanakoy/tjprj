@@ -220,20 +220,20 @@ def runClustering(**params_clustering):
     :param kwargs_sampler: arguments for sampler
     :return: Dict of arrays for BatchLoader
     """
-    if params_clustering['clustering_round'] == 0:
-        generator = BatchGenerator(**params_clustering)
-        init_batches = generator.generateBatches(params_clustering['init_nbatches'])
-        params_clustering['batches'] = init_batches
-        params_clustering['sampler'] = BatchSampler(**params_clustering)
-        params_clustering['sampler'].updateCliqueSampleProb(
-            np.ones(len(params_clustering['sampler'].cliques)))
-    else:
-        params_clustering['sampler'].updateSimMatrix(params_clustering['simMatrix'])
-        params_clustering['sampler'].transitiveCliqueComputation()
+    generator = BatchGenerator(**params_clustering)
+    init_batches = generator.generateBatches(params_clustering['init_nbatches'])
+    sampler = BatchSampler(batches=init_batches, **params_clustering)
+    sampler.updateCliqueSampleProb(
+        np.ones(len(sampler.cliques)))
+    if params_clustering['clustering_round'] > 0:
+        # Grow cliques
+        print 'Growing cliques'
+        sampler.updateSimMatrix(params_clustering['simMatrix'])
+        sampler.transitiveCliqueComputation()
 
     # # Save batchsampler
     sampler_file = open(os.path.join(params_clustering['output_dir'], 'sampler_round_' + str(params_clustering['clustering_round']) + '.pkl'), 'wb')
-    pickle.dump(params_clustering['sampler'].cliques, sampler_file, pickle.HIGHEST_PROTOCOL)
+    pickle.dump(sampler.cliques, sampler_file, pickle.HIGHEST_PROTOCOL)
     sampler_file.close()
 
     indices = np.empty(0, dtype=np.int64)
@@ -241,16 +241,17 @@ def runClustering(**params_clustering):
     label = np.empty(0, dtype=np.int64)
     print 'Sampling batches'
     for i in tqdm(range(params_clustering['sampled_nbatches'])):
-        batch = params_clustering['sampler'].sampleBatch(params_clustering['batch_size'],
+        batch = sampler.sampleBatch(params_clustering['batch_size'],
                                                          params_clustering['max_cliques_per_batch'],
                                                          mode='random')
-        _x, _f, _y = params_clustering['sampler'].parse_to_list(batch)
+        _x, _f, _y = sampler.parse_to_list(batch)
         indices = np.append(indices, _x.astype(dtype=np.int64))
         flipped = np.append(flipped, _f.astype(dtype=np.bool))
         label = np.append(label, _y.astype(dtype=np.int64))
 
     assert indices.shape[0] == flipped.shape[0] == label.shape[0], "Corrupted arguments for batch loader"
     return {'idxs': indices, 'flipvals': flipped, 'labels': label}, params_clustering
+
 
 def runClusteringSTL(**params_clustering):
     """
@@ -264,7 +265,6 @@ def runClusteringSTL(**params_clustering):
     cliques = pickle.load(cliques_file)
     sampler = BatchSampler(**{'batches': [cliques[0:params_clustering['num_classes']]]})
     sampler.updateCliqueSampleProb(np.random.rand(params_clustering['num_classes']))
-
     indices = np.empty(0, dtype=np.int64)
     flipped = np.empty(0, dtype=np.bool)
     label = np.empty(0, dtype=np.int64)
