@@ -29,8 +29,11 @@ def get_pathes(category, dataset, is_bbox_sq):
     else:
         data_path = '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/{}/crops/{}/images.mat'.format(dataset, category)
 
-    mean_path = os.path.join('/export/home/mbautist/Desktop/workspace/cnn_similarities/data/mat_files/cliqueCNN/' + category + '_batch_128_10trans_shuffleMB1shuffleALL_0/mat/mean.npy')
-    output_dir = os.path.join(os.path.expanduser('~/tmp/tf_test'))
+    # mean_path = os.path.join('/export/home/mbautist/Desktop/workspace/cnn_similarities/data/mat_files/cliqueCNN/' + category + '_batch_128_10trans_shuffleMB1shuffleALL_0/mat/mean.npy')
+    output_dir = os.path.join(os.path.expanduser(
+        '/export/home/asanakoy/workspace/OlympicSports/cnn/aug_less_aggressive_anchors'), category)
+    # output_dir = os.path.join(os.path.expanduser('~/tmp/tf_test'))
+    mean_path = os.path.join(output_dir, 'mean.npy')
     return data_path, mean_path, output_dir
 
 
@@ -202,13 +205,14 @@ def main(argv):
         'base_lr': 0.001,
         'fc_lr_mult': 1.0,
         'conv_lr_mult': 0.1,
+
         'num_layers_to_init': 6,
         'dataset': dataset,
         'category': category,
         'num_classes': None,
-        'max_iter': 10000,
+        'max_iter': 5000,
         'test_step': 500,
-        'num_clustering_rounds': 1,
+        'num_clustering_rounds': 2,
         'indexing_1_based': 0,
         'images_mat_filepath': data_path,
         'indexfile_path': None,
@@ -220,8 +224,8 @@ def main(argv):
         'shuffle_every_epoch': False,
         'online_augmentations': True,
         'async_preload': True,
-        'num_data_workers': 5,
-        'gpu_memory_fraction': 0.4,
+        'num_data_workers': 2,
+        'gpu_memory_fraction': None,
         'augmenter_params': dict(hflip=False, vflip=False,
                                  scale_to_percent=(1.0, 2 ** 0.5),
                                  scale_axis_equally=True,
