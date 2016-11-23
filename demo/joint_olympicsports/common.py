@@ -237,7 +237,7 @@ def eval_all_cat(net, step, global_step, summary_writer, params):
 
 
 def run_training_current_clustering(net, batch_manager, train_op, loss_op,
-                                    saver, **params):
+                                    saver, clustering_round=None, **params):
     log_step = 1
     summary_step = 50
 
@@ -439,7 +439,7 @@ def run_training(**params):
 
         # Run training and save snapshot
         run_training_current_clustering(net, batch_manager, train_op, loss_op,
-                                        saver, **params)
+                                        saver, clustering_round=clustering_round, **params)
         saver.save(net.sess, checkpoint_prefix,
                    global_step=clustering_round + 1)
         batch_manager.cleanup()
