@@ -11,11 +11,11 @@ from  trainhelper import trainhelper
 
 def get_sim_output_path(model_name, iteration, params):
     p = join('/export/home/asanakoy/workspace/lsp/sim/tf',
-                params['category'], 'simMatrix_{}_{}{}_iter_{}_{}_{}.mat'.
-                format(params['category'], model_name, '_nomean' if params['mean'] is None else '',
-                iteration, ''.join(params['layer_names']), params['norm_method']))
+             params['category'], 'simMatrix_{}_{}{}_iter_{}_{}_{}.mat'.
+             format(params['category'], model_name,
+                    '_nomean' if params['mean'] is None else '',
+                    iteration, ''.join(params['layer_names']), params['norm_method']))
     return p
-
 
 
 def main(argv):
@@ -36,17 +36,17 @@ def main(argv):
     # init_model = trainhelper.get_alexnet_snapshot_path()
     # init_model = '/export/home/asanakoy/workspace/OlympicSports/cnn_2/2_rounds_aug_bbox_sq/hammer_throw/checkpoint-{}'.format(iteration)
     # model_name = '2_rounds_aug_bbox_sq_hammer_throw'.format(iteration)
-    model_name = 'caffenet'
+    model_name = 'shuffle_learn_fcconvnetv2'
     im_shape = (227, 227)
 
     params = {
         'model_name': model_name,
         'category': '',
         # 'number_layers_restore': 6,
-        'layer_names': ['fc6'],
+        'layer_names': ['conv5'],
         'norm_method': None,
         'image_getter': ImageGetterFromPaths(image_paths, im_shape),
-        'mean': None,#mean,
+        'mean': None,  # mean,
         'im_shape': im_shape,
         'batch_size': 256,
         'snapshot_path': None,
@@ -56,19 +56,22 @@ def main(argv):
     sim_output_path = get_sim_output_path(model_name, iteration, params)
 
     import tfext.caffenet
+    import tfext.fcconvnetv2
+    import tfext.convnet
     net_params = {
-        'init_model': '/export/home/asanakoy/workspace/tfprj/data/bvlc_reference_caffenet/weights.npy',
-        'num_classes': 1000,
         'device_id': '/gpu:0',
-        'num_layers_to_init': 8,
         'im_shape': (227, 227, 3),
-        'use_batch_norm': False,
-        'gpu_memory_fraction': 0.5
+        'use_batch_norm': True,
+        'gpu_memory_fraction': 0.35
     }
 
-    net = tfext.caffenet.CaffeNet(**net_params)
+    net = tfext.fcconvnetv2.FcConvnetV2(**net_params)
     net.sess.run(tf.initialize_all_variables())
-    eval.features.compute_sim_and_save(sim_output_path, norm_method=params.pop('norm_method'), net=net, **params)
+    # net.restore_from_snapshot('/export/home/asanakoy/workspace/OlympicSports/cnn/convnet_joint_categories_scratch/checkpoint-180000',
+    #                           5, restore_iter_counter=True)
+    net.restore_from_alexnet_snapshot('/export/home/asanakoy/workspace/tfprj/data/shuffle_learn/shuffle_learn.tf', 5)
+    eval.features.compute_sim_and_save(sim_output_path, norm_method=params.pop('norm_method'),
+                                       net=net, **params)
 
 
 if __name__ == '__main__':
