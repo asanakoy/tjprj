@@ -61,7 +61,9 @@ def main(category):
         'snapshot_iter': 500000,
         'test_step': 500,
         'num_clustering_rounds': 80,
-        'init_nbatches': 400,
+        'custom_params_clustering': {
+            'num_initial_batches': 400,
+        },
         'recluster_on_init_sim': True,
 
         'dataset': 'OlympicSports',

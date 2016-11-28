@@ -4,7 +4,7 @@ import re
 from collections import defaultdict
 
 if __name__ == '__main__':
-    dir_path = '/export/home/asanakoy/workspace/OlympicSports/cnn/sufflelearn_shufflelearnnet_eval_nomean'
+    dir_path = '/export/home/asanakoy/workspace/OlympicSports/cnn/ft_alexnet_joint_categories_imagenet_fixall500_200initbatches'
 
     ALL_CATEGORIES = [
         'basketball_layup',
@@ -25,11 +25,15 @@ if __name__ == '__main__':
         'vault']
 
     LAYERS = ['maxpool5', 'fc6', 'fc7', 'fc8']
+    specific_iter = 445004
     results = defaultdict(dict)
     for cat in ALL_CATEGORIES:
         print cat
         for layer_name in LAYERS:
-            filenames = sorted(glob.glob1(join(dir_path, cat), layer_name + '_*'))
+            if specific_iter is None:
+                filenames = sorted(glob.glob1(join(dir_path, cat), layer_name + '_*'))
+            else:
+                filenames = sorted(glob.glob1(join(dir_path, cat), layer_name + '_*_iter-{}'.format(specific_iter)))
             print filenames
             if len(filenames) != 0:
                 matches = re.match(layer_name + r'_((?:[01][.])?[0-9]+)_iter-\d+', filenames[-1])

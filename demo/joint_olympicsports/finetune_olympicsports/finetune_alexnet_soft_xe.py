@@ -20,7 +20,7 @@ def get_pathes(category):
 
     output_dir = '/export/home/asanakoy/workspace/OlympicSports/cnn/ft_alexnet_joint_categories_imagenet_softxe/{}'.format(
         category)
-    # output_dir = os.path.join(os.path.expanduser('~/tmp/tf_test'))
+    output_dir = os.path.join(os.path.expanduser('~/tmp/tf_test'))
     # mean_path = os.path.join(output_dir, 'mean.npy')
     mean_path = '/export/home/asanakoy/workspace/OlympicSports/cnn/alexnet_joint_categories/mean.npy'
     return images_mat_pathes, mean_path, output_dir
@@ -28,7 +28,7 @@ def get_pathes(category):
 
 def main(category):
     if category is None:
-        category = 'basketball_layup'
+        category = 'vault'
 
     print category
     images_mat_pathes, mean_path, output_dir = get_pathes(category)
@@ -59,7 +59,9 @@ def main(category):
         'snapshot_iter': 'save_the_best',
         'test_step': 200,
         'num_clustering_rounds': 1,
-        'init_nbatches': None,
+        'custom_params_clustering': {
+            'num_initial_batches': 150,
+        },
 
         'dataset': 'OlympicSports',
         'images_mat_pathes': images_mat_pathes,

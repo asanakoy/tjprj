@@ -33,11 +33,11 @@ def compute_sim(net=None, norm_method='zscores', return_features=False, **params
         raise ValueError('unknown norm method: {}. Use one of {}'.format(norm_method,
                                                                          accepable_methods))
 
-    d = dict()
-    d['features'] = extract_features(False, net=net, **params)
-    d['features_flipped'] = extract_features(True, net=net, **params)
+    features_dict = dict()
+    features_dict['features'] = extract_features(False, net=net, **params)
+    features_dict['features_flipped'] = extract_features(True, net=net, **params)
     stacked = dict()
-    for key, val in d.iteritems():
+    for key, val in features_dict.iteritems():
         stacked[key] = np.hstack(val.values())
         if norm_method == 'zscores':
             stacked[key] = stat.zscore(stacked[key], axis=0)
@@ -51,10 +51,10 @@ def compute_sim(net=None, norm_method='zscores', return_features=False, **params
                                   metric='correlation')
     sim_matrix = np.float32(2 - sim_matrix)
     sim_matrix_flip = np.float32(2 - sim_matrix_flip)
-    sim = {'simMatrix': sim_matrix, 'simMatrix_flip': sim_matrix_flip}
+    sim = {'sim_matrix': sim_matrix, 'simMatrix_flip': sim_matrix_flip}
 
     if return_features:
-        return sim, d
+        return sim, features_dict
     else:
         return sim
 

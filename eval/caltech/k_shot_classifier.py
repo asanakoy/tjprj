@@ -81,22 +81,22 @@ class KshotClassifier(object):
 
 class ZeroShotClassifier(object):
     """
-    This class is a helper to evaluate results on the Caltech datasets, 0 shot learning requires a simMatrix for NN
+    This class is a helper to evaluate results on the Caltech datasets, 0 shot learning requires a sim_matrix for NN
     retrieval
     """
 
-    def __init__(self, simMatrix, y):
+    def __init__(self, sim_matrix, y):
         """
         Initialize with similarity matrix and labels
         :return:
         """
 
 
-        # if simMatrix is not input, calculate it
-        if simMatrix.shape[0] != simMatrix.shape[1]:
+        # if sim_matrix is not input, calculate it
+        if sim_matrix.shape[0] != sim_matrix.shape[1]:
             print "Initialized with features, calculating sim matrix..."
-            simMatrix = np.float32(2.0 - spdis.squareform(spdis.pdist(simMatrix, 'correlation')))
-        self.simMatrix = simMatrix
+            sim_matrix = np.float32(2.0 - spdis.squareform(spdis.pdist(sim_matrix, 'correlation')))
+        self.sim_matrix = sim_matrix
         self.labels = y
 
     def testing_sample_selection(self):
@@ -124,7 +124,7 @@ class ZeroShotClassifier(object):
 
         # Get NNs indices for every test sample
         idxs_test = self.testing_sample_selection()
-        nns = self.simMatrix[idxs_test, :]
+        nns = self.sim_matrix[idxs_test, :]
         sorted_nns = np.zeros((nns.shape[0], n))
         for idx, nn in enumerate(nns):
             sorted_nns[idx, :] = nn.argsort()[::-1][:n]

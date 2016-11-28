@@ -157,7 +157,7 @@ def run_training_current_clustering(**params):
 
 def run_training(**params):
 
-    params_clustering = trainhelper.get_params_clustering(params['dataset'], params['category'])
+    params_clustering = trainhelper.get_default_params_clustering(params['dataset'], params['category'])
 
     for clustering_round in range(0, 10):
 

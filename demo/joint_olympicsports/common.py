@@ -20,6 +20,10 @@ import helper
 from helper import BatchManager
 from tqdm import tqdm
 import pickle
+import copy
+
+from clustering.batchgenerator import BatchGenerator
+from clustering.batchsampler import BatchSampler
 
 
 def get_first_model_path():
@@ -47,24 +51,49 @@ def training_one_layer(net, loss_op, layer_name, lr, optimizer_type='adagrad'):
         return train_op
 
 
-def run_reclustering(**params_clustering):
+def run_reclustering(clustering_round=None,
+
+                     num_initial_batches=None,
+                     sim_matrix=None,
+                     flipvals=None,
+                     seq_names=None,
+                     crops_dir=None,
+                     relative_image_pathes=None,
+                     num_cliques_per_initial_batch=None,
+                     num_samples_per_clique=None,
+                     anchors=None,
+
+                     batch_size=None,
+                     num_batches_to_sample=None,
+                     max_cliques_per_batch=None,
+                     output_dir=None,
+                     seed=None):
     """
     Run clustering assignment procedure and return arrays for BatchLoader in a dict
     :param kwargs_generator: arguments for generator
     :param kwargs_sampler: arguments for sampler
     :return: Dict of arrays for BatchLoader
     """
-    from clustering.batchgenerator import BatchGenerator
-    from clustering.batchsampler import BatchSampler
-    generator = BatchGenerator(**params_clustering)
-    init_batches = generator.generateBatches(params_clustering['init_nbatches'])
-    sampler = BatchSampler(batches=init_batches, **params_clustering)
-    sampler.updateCliqueSampleProb(
-        np.ones(len(sampler.cliques)))
+    generator = BatchGenerator(sim_matrix=sim_matrix,
+                               flipvals=flipvals,
+                               seq_names=seq_names,
+                               relative_image_pathes=relative_image_pathes,
+                               crops_dir=crops_dir,
+                               num_cliques_per_initial_batch=num_cliques_per_initial_batch,
+                               num_samples_per_clique=num_samples_per_clique,
+                               anchors=anchors,
+                               seed=seed)
+    init_batches = generator.generate_batches(num_initial_batches=num_initial_batches)
+    sampler = BatchSampler(batches=init_batches,
+                           sim_matrix=sim_matrix,
+                           flipvals=flipvals,
+                           seq_names=seq_names,
+                           crops_dir=crops_dir,
+                           relative_image_pathes=relative_image_pathes,
+                           seed=seed)
 
     # # Save batchsampler
-    sampler_file = open(os.path.join(params_clustering['output_dir'], 'sampler_round_' + str(
-        params_clustering['clustering_round']) + '.pkl'), 'wb')
+    sampler_file = open(os.path.join(output_dir, 'sampler_round_' + str(clustering_round) + '.pkl'), 'wb')
     pickle.dump(sampler.cliques, sampler_file, pickle.HIGHEST_PROTOCOL)
     sampler_file.close()
 
@@ -72,20 +101,20 @@ def run_reclustering(**params_clustering):
     flipped = np.empty(0, dtype=np.bool)
     label = np.empty(0, dtype=np.int64)
     print 'Sampling batches'
-    for i in tqdm(range(params_clustering['sampled_nbatches'])):
+    for i in tqdm(range(num_batches_to_sample)):
         # print "Sampling batch {}".format(i)
-        batch = sampler.sampleBatch(params_clustering['batch_size'],
-                                     params_clustering['max_cliques_per_batch'],
+        batch = sampler.sample_batch(batch_size,
+                                     max_cliques_per_batch,
                                      mode='random')
         _x, _f, _y = sampler.parse_to_list(batch)
-        assert len(_x) == len(_f) == len(_y) == params_clustering['batch_size']
+        assert len(_x) == len(_f) == len(_y) == batch_size
         indices = np.append(indices, _x.astype(dtype=np.int64))
         flipped = np.append(flipped, _f.astype(dtype=np.bool))
         label = np.append(label, _y.astype(dtype=np.int64))
 
     assert indices.shape[0] == flipped.shape[0] == label.shape[
         0], "Corrupted arguments for batch loader"
-    return {'idxs': indices, 'flipvals': flipped, 'labels': label}, params_clustering
+    return {'idxs': indices, 'flipvals': flipped, 'labels': label}
 
 
 def set_summary_tracking(graph, track_moving_averages):
@@ -315,7 +344,27 @@ def run_training_current_clustering(net, batch_manager, train_op, loss_op,
                      params['batch_size'] / duration))
 
 
-def cluster_category(clustering_round, recluster_on_init_sim, category, output_dir, params_clustering, seed):
+def cluster_category(clustering_round=None,
+                     recluster_on_init_sim=True,
+
+                     num_initial_batches=None,
+                     pathtosim=None,
+                     pathtosim_avg=None,  # only used for clustering on HOG-LDA
+                     seq_names=None,
+                     crops_dir=None,
+                     relative_image_pathes=None,
+                     num_cliques_per_initial_batch=None,
+                     num_samples_per_clique=None,
+                     anchors=None,
+
+                     batch_size=None,
+                     num_batches_to_sample=None,
+                     max_cliques_per_batch=None,
+                     output_dir=None,
+                     seed=None,
+
+                     dataset='OlympicSports',
+                     category=''):
     # Delete old batch_ldr, recompute clustering and create new batch_ldr
     # Use HOGLDA for initial estimate of similarities
     # Just recluster on the HOGLDA sim every round
@@ -323,20 +372,33 @@ def cluster_category(clustering_round, recluster_on_init_sim, category, output_d
     matrices = trainhelper.get_step_similarities(step=0 if recluster_on_init_sim else clustering_round,
                                                  net=None,
                                                  category=category,
-                                                 dataset='OlympicSports',
+                                                 dataset=dataset,
                                                  layers=None,
-                                                 pathtosim=params_clustering['pathtosim'],
-                                                 pathtosim_avg=params_clustering[
-                                                     'pathtosim_avg'])
+                                                 pathtosim=pathtosim,
+                                                 pathtosim_avg=pathtosim_avg)
 
     # Run clustering and update corresponding param fields
-    params_clustering.update(matrices)
-    params_clustering['clustering_round'] = clustering_round
-    params_clustering['output_dir'] = output_dir
     # TODO: maybe recluster next round not on anchors
     if seed is not None:
         seed += clustering_round
-    index_dict, _ = run_reclustering(seed=seed, **params_clustering)
+
+    index_dict = run_reclustering(clustering_round=None,
+
+                                  num_initial_batches=num_initial_batches,
+                                  sim_matrix=matrices['sim_matrix'],
+                                  flipvals=matrices['flipvals'],
+                                  seq_names=seq_names,
+                                  crops_dir=crops_dir,
+                                  relative_image_pathes=relative_image_pathes,
+                                  num_cliques_per_initial_batch=num_cliques_per_initial_batch,
+                                  num_samples_per_clique=num_samples_per_clique,
+                                  anchors=anchors,
+
+                                  batch_size=batch_size,
+                                  num_batches_to_sample=num_batches_to_sample,
+                                  max_cliques_per_batch=max_cliques_per_batch,
+                                  output_dir=output_dir,
+                                  seed=seed)
     return index_dict
 
 
@@ -356,18 +418,20 @@ def run_training(**params):
         num_classes = 0
         batch_loaders = dict()
         for cat in CATEGORIES:
-            params_clustering = trainhelper.get_params_clustering('OlympicSports', cat)
+            params_clustering = trainhelper.get_default_params_clustering('OlympicSports', cat)
+            del params_clustering['category']
+            for key in params['custom_params_clustering']:
+                if key not in params_clustering:
+                    raise ValueError('Unexpected key in custom_params_clustering: {}'.format(key))
+            params_clustering.update(params['custom_params_clustering'])
             # set num batches of cliques to number of anchors
-            if params['init_nbatches'] is None:
-                params_clustering['init_nbatches'] = len(params_clustering['anchors']['anchor'])
-            else:
-                params_clustering['init_nbatches'] = params['init_nbatches']
+            if params_clustering['num_initial_batches'] is None:
+                params_clustering['num_initial_batches'] = len(params_clustering['anchors']['anchor'])
             index_dict = cluster_category(clustering_round,
                                           recluster_on_init_sim=params['recluster_on_init_sim'],
                                           category=cat,
                                           output_dir=params['output_dir'],
-                                          params_clustering=params_clustering,
-                                          seed=params['seed'])
+                                          seed=params['seed'], **params_clustering)
             index_dict['labels'] = np.asarray(index_dict['labels']) + num_classes
             num_classes = index_dict['labels'].max() + 1
 

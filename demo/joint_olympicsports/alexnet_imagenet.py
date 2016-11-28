@@ -45,7 +45,9 @@ def main(argv):
         'snapshot_iter': 2500,
         'test_step': 2500,
         'num_clustering_rounds': 200,
-        'init_nbatches': 110,
+        'custom_params_clustering': {
+            'num_initial_batches': None,
+        },
 
         'dataset': 'OlympicSports',
         'images_mat_pathes': images_mat_pathes,

@@ -50,7 +50,9 @@ def main(argv):
         'snapshot_iter': 10000,
         'test_step': 2000,
         'num_clustering_rounds': 200,
-        'init_nbatches': None,
+        'custom_params_clustering': {
+            'num_initial_batches': None,
+        },
 
         'dataset': 'OlympicSports',
         'images_mat_pathes': images_mat_pathes,

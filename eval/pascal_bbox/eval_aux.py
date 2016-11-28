@@ -205,11 +205,11 @@ class supervised_evaluation(object):
 
         simMatrix_aux = spdis.cdist(features_test, features_train,
                                     'correlation')
-        self.simMatrix = np.float32(2.0 - simMatrix_aux)
+        self.sim_matrix = np.float32(2.0 - simMatrix_aux)
 
         # pathtosim = '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/VOC/classification/sims/simMatrix_VOC_iter_1_bvlc_alexnet_fc6_0.mat'
         # s = sio.loadmat(pathtosim)
-        # self.simMatrix = s['simMatrix']
+        # self.sim_matrix = s['sim_matrix']
 
     def testing_sample_selection(self):
         """
@@ -228,20 +228,20 @@ class supervised_evaluation(object):
         """
 
         # Get NNs indices for every test sample
-        sorted_nns = np.zeros((self.simMatrix.shape[0], n))
-        sorted_nns_score = np.zeros((self.simMatrix.shape[0], n))
-        for idx_row, sim_row in enumerate(self.simMatrix):
+        sorted_nns = np.zeros((self.sim_matrix.shape[0], n))
+        sorted_nns_score = np.zeros((self.sim_matrix.shape[0], n))
+        for idx_row, sim_row in enumerate(self.sim_matrix):
             perm = sim_row.argsort()
             idxs_nns = perm[::-1][:n]
             sorted_nns[idx_row, :] = idxs_nns
-            sorted_nns_score[idx_row, :] = self.simMatrix[idx_row, idxs_nns]
+            sorted_nns_score[idx_row, :] = self.sim_matrix[idx_row, idxs_nns]
 
         # Initialize linear decaying weights for sampels and pred_labels)
-        pred_labels = np.zeros((self.simMatrix.shape[0], self.test_labels.max() + 1))
+        pred_labels = np.zeros((self.sim_matrix.shape[0], self.test_labels.max() + 1))
 
         # Loop over test samples disregarding self similarity and vote for each label with a weight depending
         # on the position of the NN
-        for test_sample in xrange(self.simMatrix.shape[0]):
+        for test_sample in xrange(self.sim_matrix.shape[0]):
             votes_per_label = dict.fromkeys(np.unique(self.test_labels), 0.0)
             scores_per_label = dict.fromkeys(np.unique(self.test_labels), 0.0)
             for idx, nn in enumerate(sorted_nns[test_sample, :]):

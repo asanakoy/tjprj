@@ -136,9 +136,9 @@ def run_training_current_clustering(**params):
 
 def run_training(**params):
 
-    params_clustering = trainhelper.get_params_clustering(params['dataset'], params['category'])
+    params_clustering = trainhelper.get_default_params_clustering(params['dataset'], params['category'])
     # set num batches of cliques to number of anchors
-    params_clustering['init_nbatches'] = len(params_clustering['anchors']['anchor'])
+    params_clustering['num_initial_batches'] = len(params_clustering['anchors']['anchor'])
 
     for clustering_round in range(0, params['num_clustering_rounds']):
         # Use HOGLDA for initial estimate of similarities

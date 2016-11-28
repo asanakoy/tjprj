@@ -15,7 +15,7 @@ features = np.load(pathtohogfeatures)
 
 data = sio.loadmat('/export/home/mbautist/Desktop/Caltech101/simMatrix_Caltech101_2_rounds_iter1_fc7_zscores.mat')
 
-features = data['simMatrix']
+features = data['sim_matrix']
 labels = np.load(pathtolabels)
 
 # Initialize classifiers

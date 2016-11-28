@@ -18,7 +18,7 @@ def get_pathes(category):
         cat: '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/OlympicSports/crops/{}/images.mat'.format(
             cat) for cat in [category]}
 
-    output_dir = '/export/home/asanakoy/workspace/OlympicSports/cnn/ft_alexnet_joint_categories_imagenet_fixall500_200initbatches/{}'.format(
+    output_dir = '/export/home/asanakoy/workspace/OlympicSports/cnn/alexnet_imagenet_cliquesize2/{}'.format(
         category)
     # output_dir = os.path.join(os.path.expanduser('~/tmp/tf_test'))
     # mean_path = os.path.join(output_dir, 'mean.npy')
@@ -28,7 +28,7 @@ def get_pathes(category):
 
 def main(category):
     if category is None:
-        category = 'bowling'
+        category = 'long_jump'
     print category
     images_mat_pathes, mean_path, output_dir = get_pathes(category)
 
@@ -40,23 +40,28 @@ def main(category):
         'batch_size': 128,
         'fc_lr': 0.001,
         'conv_lr': 0.0001,
-        'fix_conv_iter': 7000,
-        'only_fc_train_op_iter': 7000,
-        'fix_up_to_the_last': 500,
+        'fix_conv_iter': 1000,
+        'only_fc_train_op_iter': 1000,
+        'fix_up_to_the_last': 0,
 
         'track_moving_averages': False,
 
         'test_layers': ['maxpool5', 'fc6', 'fc7', 'fc8'],
-        'snapshot_path_to_restore': '/export/home/asanakoy/workspace/OlympicSports/cnn/alexnet_joint_categories/checkpoint-445004',
+        'snapshot_path_to_restore': None,
         'init_model': get_first_model_path(),
-        'num_layers_to_init': 0,
+        'num_layers_to_init': 6,
         'network': tfext.alexnet.Alexnet,
 
-        'max_iter': 5000,
+        'max_iter': 12000,
         'snapshot_iter': 'save_the_best',
-        'test_step': 250,
+        'test_step': 500,
         'num_clustering_rounds': 1,
-        'init_nbatches': 200,
+        'custom_params_clustering': {
+            'num_initial_batches': 400,
+            'num_samples_per_clique': 2,
+
+            'num_batches_to_sample': 1000
+        },
 
         'dataset': 'OlympicSports',
         'images_mat_pathes': images_mat_pathes,
@@ -67,8 +72,8 @@ def main(category):
 
         'random_shuffle_categories': False,
         'shuffle_every_epoch': True,
-        'online_augmentations': False,
-        'async_preload': False,
+        'online_augmentations': True,
+        'async_preload': True,
         'num_data_workers': 1,
         'gpu_memory_fraction': 0.30,
         'augmenter_params': dict(hflip=False, vflip=False,
@@ -77,7 +82,7 @@ def main(category):
                                  rotation_deg=10, shear_deg=4,
                                  translation_x_px=15, translation_y_px=15),
 
-        'device_id': '/gpu:{}'.format(0)
+        'device_id': '/gpu:0'
     }
     suffix = datetime.datetime.now().strftime("%y%m%d_%H%M%S")
     with open(os.path.join(output_dir, 'train_params.dump_{}.txt'.format(suffix)), 'w') as f:
@@ -88,6 +93,7 @@ def main(category):
 if __name__ == '__main__':
     # main(None)
     ALL_CATEGORIES = [
+        'long_jump',
         'diving_platform_10m',
         'basketball_layup',
         'bowling',
@@ -97,7 +103,6 @@ if __name__ == '__main__':
         'hammer_throw',
         'high_jump',
         'javelin_throw',
-        'long_jump',
         'pole_vault',
         'shot_put',
         'snatch',
@@ -105,7 +110,14 @@ if __name__ == '__main__':
         'triple_jump',
         'vault']
 
-    n_jobs = int(sys.argv[1])
-    print 'Running {} workers'.format(n_jobs)
-    Parallel(n_jobs=n_jobs)(
-        delayed(main)(cat) for cat in ALL_CATEGORIES)
+    begin = int(sys.argv[1])
+    end = int(sys.argv[2])
+    assert 0 <= begin < end <= len(ALL_CATEGORIES)
+    print '(Begin, end) category: [{}, {})'.format(begin, end)
+
+    for i in xrange(begin, end):
+        main(ALL_CATEGORIES[i])
+    # n_jobs = int(sys.argv[1])
+    # print 'Running {} workers'.format(n_jobs)
+    # Parallel(n_jobs=n_jobs)(
+    #     delayed(main)(cat) for cat in ALL_CATEGORIES)
