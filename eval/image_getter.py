@@ -3,14 +3,13 @@ import h5py
 import numpy as np
 import PIL
 from PIL import Image
-import scipy.misc
 
 
 class ImageGetterFromMat:
     """
     Class for loading batches by index from mat file
     """
-    def __init__(self, mat_path, load_all_in_memory=False):
+    def __init__(self, mat_path, load_all_in_memory=False, rgb_batch=False):
         dataset = h5py.File(mat_path, 'r')
         has_images_mat = 'images_mat' in dataset
         has_images = 'images' in dataset
@@ -22,6 +21,7 @@ class ImageGetterFromMat:
             self.images_ref = dataset['images']
         if load_all_in_memory:
             self.images_ref = self.images_ref[...]
+        self.rgb_batch = rgb_batch
 
     def total_num_images(self):
         return self.images_ref.shape[0]
@@ -32,7 +32,9 @@ class ImageGetterFromMat:
         :param indxs: numeric indices of the images to include in the batch
         :param resize_shape:
         :param mean: must be HxWxC RGB
-        :return: batch of images as np.array NxHxWxC with BGR channel order
+        :return: batch of images as np.array NxHxWxC with:
+            RGB channel order if self.rgb_batch == True
+            BGR channel order otherwise
         """
         assert len(resize_shape) == 2, 'resize_shape must be of len 2: (h, w)!'
         assert mean is None or (len(mean.shape) == 3 and mean.shape[2] == 3)
@@ -50,7 +52,8 @@ class ImageGetterFromMat:
         batch = np.asarray(batch, dtype=np.float32)
         if mean is not None:
             batch -= np.tile(mean, (batch.shape[0], 1, 1, 1))
-        batch = batch[:, :, :, (2, 1, 0)]  # reorder channels RGB -> BGR
+        if not self.rgb_batch:
+            batch = batch[:, :, :, (2, 1, 0)]  # reorder channels RGB -> BGR
         return batch
 
 
@@ -59,7 +62,7 @@ class ImageGetterFromPaths:
     Class for loading batches by index from disk by paths
     """
 
-    def __init__(self, image_paths, im_shape):
+    def __init__(self, image_paths, im_shape, rgb_batch=False):
         """
         :param image_paths: list of full pathes
         :param im_shape: default im_shape to use when reading images
@@ -67,6 +70,7 @@ class ImageGetterFromPaths:
         assert len(im_shape) == 2, 'im_shape must be of len 2: (h, w)!'
         self.image_paths = image_paths
         self.im_shape = im_shape
+        self.rgb_batch = rgb_batch
 
     def total_num_images(self):
         return len(self.image_paths)
@@ -78,7 +82,9 @@ class ImageGetterFromPaths:
         :param resize_shape: resize images to this shape.
                              If None, resize to self.im_shape.
         :param mean: must be HxWxC RGB
-        :return: batch of images as np.array NxHxWxC with BGR channel order
+        :return: batch of images as np.array NxHxWxC with:
+            RGB channel order if self.rgb_batch == True
+            BGR channel order otherwise
         """
         assert len(resize_shape) == 2, 'resize_shape must be of len 2: (h, w)!'
         assert mean is None or (len(mean.shape) == 3 and mean.shape[2] == 3)
@@ -95,5 +101,6 @@ class ImageGetterFromPaths:
 
         if mean is not None:
             batch -= np.tile(mean, (batch.shape[0], 1, 1, 1))
-        batch = batch[:, :, :, (2, 1, 0)]  # reorder channels RGB -> BGR
+        if not self.rgb_batch:
+            batch = batch[:, :, :, (2, 1, 0)]  # reorder channels RGB -> BGR
         return batch
