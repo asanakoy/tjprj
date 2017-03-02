@@ -101,7 +101,7 @@ def get_step_similarities(step, net, category, dataset, layers, pathtosim=None, 
         else:
             # TODO: if we use crops bbox_sq than change the pathes to mat_file and mean here
             d = get_sim(net, category, layers, return_features=False)
-        simMatrix_joined = np.dstack((d['sim_matrix'], d['simMatrix_flip']))
+        simMatrix_joined = np.dstack((d['simMatrix'], d['simMatrix_flip']))
         flipvals = simMatrix_joined.argmax(axis=2)
         sim_matrix = simMatrix_joined.max(axis=2)
         return {'sim_matrix': sim_matrix, 'flipvals': flipvals}

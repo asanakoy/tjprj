@@ -32,7 +32,7 @@ def fill_feed_dict(net, batch_loader, batch_size=128, phase='test'):
 
 
     images_feed, labels_feed = batch_loader.get_next_batch(batch_size)
-    # TODO: remove after I fix BatchLoader. Presently BatchLoader outputs CxHxW images.
+    # TODO: remove after I fix BatchLoader. Presently BatchLoader outputs CxHxW BGR images.
     images_feed = images_feed.transpose((0, 2, 3, 1))
 
     feed_dict = {

@@ -1,5 +1,4 @@
-# Original work Copyright 2015 The TensorFlow Authors. Licensed under the Apache License v2.0 http://www.apache.org/licenses/LICENSE-2.0
-# Modified work Copyright (c) 2016 Artsiom Sanakoyeu
+# Copyright (c) 2016 Artsiom Sanakoyeu
 
 # pylint: disable=missing-docstring
 # from __future__ import absolute_import

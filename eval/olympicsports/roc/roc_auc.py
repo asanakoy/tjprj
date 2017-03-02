@@ -89,7 +89,7 @@ def compute_interpolated_roc_auc(labels_dict, false_pos_rate_list, true_pos_rate
 
 
 def compute_roc(d, sim):
-    stacked_sim_matrix = np.stack([sim['sim_matrix'], sim['simMatrix_flip']], axis=2)
+    stacked_sim_matrix = np.stack([sim['simMatrix'], sim['simMatrix_flip']], axis=2)
     assert stacked_sim_matrix.ndim == 3 and stacked_sim_matrix.shape[2] == 2
     assert stacked_sim_matrix[0, 0, 0] > stacked_sim_matrix[0, 0, 1]
 
