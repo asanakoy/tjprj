@@ -79,9 +79,9 @@ def setup_network(**params):
     saver = tf.train.Saver()
 
     # Instantiate a SummaryWriter to output summaries and the Graph of the current sesion.
-    tf.scalar_summary(['loss', 'batch_accuracy', 'conv_lr'], [loss, accuracy, conv_lr_pl])
+    tf.summary.scalar(['loss', 'batch_accuracy', 'conv_lr'], [loss, accuracy, conv_lr_pl])
 
-    net.sess.run(tf.initialize_all_variables())
+    net.sess.run(tf.global_variables_initializer())
     net.restore_from_alexnet_snapshot(trainhelper.get_alexnet_snapshot_path(),
                                       params['num_layers_to_init'])
 
@@ -113,8 +113,8 @@ def run_training_current_clustering(**params):
     log_step = 1
     summary_step = 50
 
-    summary_writer = tf.train.SummaryWriter(params['output_dir'], net.sess.graph)
-    summary = tf.merge_all_summaries()
+    summary_writer = tf.summary.FileWriter(params['output_dir'], net.sess.graph)
+    summary = tf.summary.merge_all()
 
     for step in xrange(params['max_iter']):
 

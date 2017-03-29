@@ -121,7 +121,7 @@ def set_summary_tracking(graph, track_moving_averages):
     with graph.as_default():
         if track_moving_averages:
             movin_avg_vars = [v for v in tf.get_collection(tf.GraphKeys.VARIABLES) if 'moving_' in v.name]
-            tf.scalar_summary(['moving/' + v.name for v in movin_avg_vars],
+            tf.summary.scalar(['moving/' + v.name for v in movin_avg_vars],
                               [tf.nn.l2_loss(v) for v in movin_avg_vars])
 
 
@@ -163,10 +163,10 @@ def setup_alexnet_network(num_classes, loss_type, batch_size, optimizer_type,
 
     conv5w_norm = tf.nn.l2_loss(net.graph.get_tensor_by_name('conv5/weight:0'))
     conv5b_norm = tf.nn.l2_loss(net.graph.get_tensor_by_name('conv5/bias:0'))
-    tf.scalar_summary(['loss', 'batch_accuracy', 'conv_lr', 'fc_lr', 'conv5w_norm', 'conv5b_norm'],
+    tf.summary.scalar(['loss', 'batch_accuracy', 'conv_lr', 'fc_lr', 'conv5w_norm', 'conv5b_norm'],
                       [loss_op, accuracy, conv_lr_pl, fc_lr_pl, conv5w_norm, conv5b_norm])
 
-    net.sess.run(tf.initialize_all_variables())
+    net.sess.run(tf.global_variables_initializer())
     if snapshot_path_to_restore is not None:
         print('Restoring 7 layers from snapshot {}'.format(snapshot_path_to_restore))
         net.restore_from_snapshot(snapshot_path_to_restore, 7, restore_iter_counter=True)
@@ -194,10 +194,10 @@ def setup_convnet_network(network_class, num_classes, loss_type, batch_size,
 
     conv5w_norm = tf.nn.l2_loss(net.graph.get_tensor_by_name('conv5/weight:0'))
     conv5b_norm = tf.nn.l2_loss(net.graph.get_tensor_by_name('conv5/bias:0'))
-    tf.scalar_summary(['loss', 'batch_accuracy', 'conv_lr', 'fc_lr', 'conv5w_norm', 'conv5b_norm'],
+    tf.summary.scalar(['loss', 'batch_accuracy', 'conv_lr', 'fc_lr', 'conv5w_norm', 'conv5b_norm'],
                       [loss_op, accuracy, conv_lr_pl, fc_lr_pl, conv5w_norm, conv5b_norm])
 
-    net.sess.run(tf.initialize_all_variables())
+    net.sess.run(tf.global_variables_initializer())
     # init with alexnet if necessary
     net.restore_from_alexnet_snapshot(trainhelper.get_alexnet_snapshot_path(),
                                       net_params['num_layers_to_init'])
@@ -217,11 +217,11 @@ def setup_convnet_network(network_class, num_classes, loss_type, batch_size,
     last_layer_name = 'fc6' if network_class == tfext.convnet.Convnet else 'fc8'
     training_one_layer(net, loss_op, last_layer_name, fc_lr_pl)
 
-    uninit_vars = [v for v in tf.all_variables()
+    uninit_vars = [v for v in tf.global_variables()
                    if not tf.is_variable_initialized(v).eval(session=net.sess)]
     print 'uninit vars:', [v.name for v in uninit_vars]
     assert optimizer_type == 'sgd' or len(uninit_vars) > 0
-    net.sess.run(tf.initialize_variables(uninit_vars))
+    net.sess.run(tf.variables_initializer(uninit_vars))
 
     return net, train_op, loss_op, saver
 
@@ -271,8 +271,8 @@ def run_training_current_clustering(net, batch_manager, train_op, loss_op,
     summary_step = 50
 
     with net.graph.as_default():
-        summary_writer = tf.train.SummaryWriter(params['output_dir'], net.sess.graph)
-        summary_op = tf.merge_all_summaries()
+        summary_writer = tf.summary.FileWriter(params['output_dir'], net.sess.graph)
+        summary_op = tf.summary.merge_all()
         fc_train_op = net.graph.get_operation_by_name('fc_train_op')
         try:
             last_layer_train_op = net.graph.get_operation_by_name('last_layer_train_op')
@@ -482,7 +482,7 @@ def run_training(**params):
             else:
                 raise ValueError('Unknown network')
             if clustering_round == 0 and params['reset_iter_counter']:
-                tf.initialize_variables([net.global_iter_counter])
+                tf.variables_initializer([net.global_iter_counter])
 
         set_summary_tracking(net.graph, track_moving_averages=params.get('track_moving_averages', False))
 
@@ -496,10 +496,10 @@ def run_training(**params):
 
         with net.graph.as_default():
             print 'Reset momentum and Adagrad accumulators'
-            optimizer_vars = [v for v in tf.all_variables()
+            optimizer_vars = [v for v in tf.global_variables()
                            if 'adagrad' in v.name.lower() or 'momentum' in v.name.lower()]
             print [v.name for v in optimizer_vars]
-            tf.initialize_variables(optimizer_vars)
+            tf.variables_initializer(optimizer_vars)
 
         # Run training and save snapshot
         run_training_current_clustering(net, batch_manager, train_op, loss_op,

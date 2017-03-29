@@ -352,10 +352,10 @@ class ExemplarCnnNet(object):
         if group == 1:
             conv = convolve(input, kernel, name='conv')
         else:
-            input_groups = tf.split(3, group, input)
-            kernel_groups = tf.split(3, group, kernel)
+            input_groups = tf.split(axis=3, num_or_size_splits=group, value=input)
+            kernel_groups = tf.split(axis=3, num_or_size_splits=group, value=kernel)
             output_groups = [convolve(i, k) for i, k in zip(input_groups, kernel_groups)]
-            conv = tf.concat(3, output_groups)
+            conv = tf.concat(axis=3, values=output_groups)
         return tf.reshape(tf.nn.bias_add(conv, biases),
                           [-1] + conv.get_shape().as_list()[1:], name='conv')
 
@@ -405,7 +405,7 @@ if __name__ == "__main__":
     with tf.Graph().as_default():
         net = ExemplarCnnNet(init_model=path_to_snapshot, num_layers_to_init=4, num_classes=1000, device_id=0,
                              gpu_memory_fraction=0.4, random_init_type=ExemplarCnnNet.RandomInitType.XAVIER_GAUSSIAN)
-        net.sess.run(tf.initialize_all_variables())
+        net.sess.run(tf.global_variables_initializer())
         saver = tf.train.Saver()
         saver.save(net.sess, '/export/home/mbautist/Desktop/exemplar_cnn_conv')
         saver.restore(net.sess, '/export/home/mbautist/Desktop/exemplar_cnn_conv')

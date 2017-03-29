@@ -67,7 +67,7 @@ def main(argv):
     }
 
     net = tfext.caffenet.CaffeNet(**net_params)
-    net.sess.run(tf.initialize_all_variables())
+    net.sess.run(tf.global_variables_initializer())
     eval.features.compute_sim_and_save(sim_output_path, norm_method=params.pop('norm_method'), net=net, **params)
 
 

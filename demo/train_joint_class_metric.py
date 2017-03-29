@@ -92,10 +92,10 @@ def setup_network(**params):
         saver = tf.train.Saver()
 
         # Instantiate a SummaryWriter to output summaries and the Graph of the current sesion.
-        summary_writer = tf.train.SummaryWriter(params['output_dir'], net.sess.graph)
-        summary = tf.scalar_summary(['loss', 'batch_accuracy'], [loss, accuracy])
+        summary_writer = tf.summary.FileWriter(params['output_dir'], net.sess.graph)
+        summary = tf.summary.scalar(['loss', 'batch_accuracy'], [loss, accuracy])
 
-        net.sess.run(tf.initialize_all_variables())
+        net.sess.run(tf.global_variables_initializer())
         # net.restore_from_snapshot(params['snapshot_path_to_restore'], num_layers=7)
 
     return {'net': net, 'train_op': train_op, 'loss': loss, 'saver': saver, 'summary_writer': summary_writer,

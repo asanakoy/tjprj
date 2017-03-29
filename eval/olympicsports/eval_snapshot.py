@@ -62,7 +62,7 @@ def run_eval(net, categories, test_layers, images_mat_pathes, mean_filepath, out
 
 def setup_network(network_class, snapshot_path_to_restore, num_layers_to_init, gpu_memory_fraction):
     net = network_class(gpu_memory_fraction=gpu_memory_fraction)
-    net.sess.run(tf.initialize_all_variables())
+    net.sess.run(tf.global_variables_initializer())
     if snapshot_path_to_restore is not None:
         print('Restoring 7 layers from snapshot {}'.format(snapshot_path_to_restore))
         net.restore_from_snapshot(snapshot_path_to_restore, num_layers_to_init, restore_iter_counter=False)

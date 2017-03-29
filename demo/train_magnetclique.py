@@ -84,12 +84,12 @@ def run_training(**params):
 
         # Add the Op to compare the logits to the labels during correct_classified_top1.
         # eval_correct_top1 = network_spec.correct_classified_top1(logits, net.y_gt)
-        summary = tf.merge_all_summaries()
+        summary = tf.summary.merge_all()
         saver = tf.train.Saver()
 
         # Instantiate a SummaryWriter to output summaries and the Graph of the current sesion.
-        summary_writer = tf.train.SummaryWriter(params['output_dir'], net.sess.graph)
-        net.sess.run(tf.initialize_all_variables())
+        summary_writer = tf.summary.FileWriter(params['output_dir'], net.sess.graph)
+        net.sess.run(tf.global_variables_initializer())
 
         if params['ftCliqueCNN']:
             snapshot_path = '/export/home/asanakoy/workspace01/datasets/OlympicSports/cnn/long_jump/checkpoint-20000'

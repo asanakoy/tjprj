@@ -285,7 +285,7 @@ if __name__ == "__main__":
                                   num_classes=1000, num_layers_to_init=6)
 
 
-    net.sess.run(tf.initialize_all_variables())
+    net.sess.run(tf.global_variables_initializer())
     ev = supervised_evaluation(net=net)
     acc = ev.ten_fold_cv_nn_eval(10)
     print acc

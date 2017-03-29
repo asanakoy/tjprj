@@ -129,13 +129,13 @@ class Stlnet(object):
                 self.prob_stl10 = tf.nn.softmax(self.fc_stl10, name='prob_stl10')
 
             fc_cliques_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "fc_cliques")
-            self.reset_fc_cliqeus_op = tf.initialize_variables(fc_cliques_vars, name='reset_fc_cliques')
+            self.reset_fc_cliqeus_op = tf.variables_initializer(fc_cliques_vars, name='reset_fc_cliques')
 
             stl_10_vars = list()
             map(lambda vrs: stl_10_vars.extend(vrs),
                 [tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, names)
                  for names in ['conv10', 'conv11', 'fc_stl10']])
-            self.reset_fc_stl10_op = tf.initialize_variables(stl_10_vars, name='reset_fc_stl10')
+            self.reset_fc_stl10_op = tf.variables_initializer(stl_10_vars, name='reset_fc_stl10')
 
         self.graph = tf.get_default_graph()
         config = tf.ConfigProto(log_device_placement=False,

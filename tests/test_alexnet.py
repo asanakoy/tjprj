@@ -45,12 +45,12 @@ if __name__ == '__main__':
 
     net = tfext.alexnet.Alexnet(**params)
 
-    cross_entropy = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(net.fc8, net.y_gt))
+    cross_entropy = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=net.fc8, labels=net.y_gt))
     train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy, global_step=net.global_iter_counter)
     # train_step = tf.train.AdagradOptimizer(1e-4).minimize(cross_entropy)
     correct_prediction = tf.equal(tf.cast(tf.argmax(net.prob, 1), tf.int32), net.y_gt)
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-    net.sess.run(tf.initialize_all_variables())
+    net.sess.run(tf.global_variables_initializer())
     saver = tf.train.Saver()
     saver.save(net.sess, '/export/home/asanakoy/tmp/alexnet-tf-test')
     saver.restore(net.sess, '/export/home/asanakoy/tmp/alexnet-tf-test')

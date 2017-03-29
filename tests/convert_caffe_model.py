@@ -25,7 +25,7 @@ def test_snaphot():
     }
     with tf.Graph().as_default():
         net = tfext.alexnet.Alexnet(**params)
-        net.sess.run(tf.initialize_all_variables())
+        net.sess.run(tf.global_variables_initializer())
         checkpoint_prefix = SNAPSHOT_PREFIX_PATH
         saver = tf.train.Saver()
         saver.restore(net.sess, checkpoint_prefix)
@@ -65,7 +65,7 @@ def convert():
     }
     with tf.Graph().as_default():
         net = tfext.alexnet.Alexnet(**params)
-        net.sess.run(tf.initialize_all_variables())
+        net.sess.run(tf.global_variables_initializer())
         saver = tf.train.Saver()
         checkpoint_prefix = SNAPSHOT_PREFIX_PATH
         saver.save(net.sess, checkpoint_prefix, write_meta_graph=True)

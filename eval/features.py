@@ -134,7 +134,7 @@ def extract_features(flipped, net=None, frame_ids=None, layer_names=None,
             if params['number_layers_restore'] == 8 and 'num_classes' not in params:
                 raise ValueError('You must specify "num_classes" if you restore 8 layers')
             net = tfext.alexnet.Alexnet(init_model=None, **params)
-            net.sess.run(tf.initialize_all_variables())
+            net.sess.run(tf.global_variables_initializer())
             assert os.path.exists(params['snapshot_path'])
             net.restore_from_snapshot(params['snapshot_path'], params['number_layers_restore'])
     else:

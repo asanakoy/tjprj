@@ -19,7 +19,7 @@ class TestAlexnet(TestCase):
         with self.graph.as_default():
             net = tfext.alexnet.Alexnet(**params)
             cross_entropy = tf.reduce_mean(
-                tf.nn.sparse_softmax_cross_entropy_with_logits(net.fc8, net.y_gt))
+                tf.nn.sparse_softmax_cross_entropy_with_logits(logits=net.fc8, labels=net.y_gt))
             train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
             correct_prediction = tf.equal(tf.cast(tf.argmax(net.prob, 1), tf.int32), net.y_gt)
             accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
@@ -28,12 +28,12 @@ class TestAlexnet(TestCase):
     def test_restore_from_other_snapshot(self):
         snapshot_path = '/export/home/asanakoy/workspace01/datasets/OlympicSports/cnn/cnn_tf_old/long_jump/checkpoint-20000'
         with self.graph.as_default():
-            self.net.sess.run(tf.initialize_all_variables())
+            self.net.sess.run(tf.global_variables_initializer())
             with self.assertRaises(Exception):
                 self.net.restore_from_snapshot(snapshot_path, 7)
 
     def test_restore_from_snapshot(self):
         snapshot_path = '/export/home/asanakoy/workspace/lsp/cnn/checkpoint-30000'
         with self.graph.as_default():
-            self.net.sess.run(tf.initialize_all_variables())
+            self.net.sess.run(tf.global_variables_initializer())
             self.net.restore_from_snapshot(snapshot_path, 7)

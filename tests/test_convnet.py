@@ -43,7 +43,7 @@ if __name__ == '__main__':
 
     with net.graph.as_default():
         cross_entropy = tf.reduce_mean(
-            tf.nn.sparse_softmax_cross_entropy_with_logits(net.fc6, net.y_gt))
+            tf.nn.sparse_softmax_cross_entropy_with_logits(logits=net.fc6, labels=net.y_gt))
         # update_ops = net.graph.get_collection(tf.GraphKeys.UPDATE_OPS)
         # assert len(update_ops) > 0
         # with tf.control_dependencies(update_ops):
@@ -57,7 +57,7 @@ if __name__ == '__main__':
         train_step = net.graph.get_operation_by_name('fc_train_op')
         correct_prediction = tf.equal(tf.cast(tf.argmax(net.prob, 1), tf.int32), net.y_gt)
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-    net.sess.run(tf.initialize_all_variables())
+    net.sess.run(tf.global_variables_initializer())
 
     saver = tf.train.Saver()
     net.restore_from_alexnet_snapshot(trainhelper.get_alexnet_snapshot_path(), 5)

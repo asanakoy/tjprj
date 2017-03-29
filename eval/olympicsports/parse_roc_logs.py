@@ -4,7 +4,7 @@ import re
 from collections import defaultdict
 
 if __name__ == '__main__':
-    dir_path = '/export/home/asanakoy/workspace/OlympicSports/cnn/ft_alexnet_joint_categories_imagenet_fixall500_200initbatches'
+    dir_path = '//export/home/asanakoy/workspace/OlympicSports/cnn/alexnet_imagenet_cliquesize2/'
 
     ALL_CATEGORIES = [
         'basketball_layup',
@@ -25,7 +25,7 @@ if __name__ == '__main__':
         'vault']
 
     LAYERS = ['maxpool5', 'fc6', 'fc7', 'fc8']
-    specific_iter = 445004
+    specific_iter = None
     results = defaultdict(dict)
     for cat in ALL_CATEGORIES:
         print cat

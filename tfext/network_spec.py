@@ -53,7 +53,7 @@ def loss(logits, labels):
     """
     labels = tf.to_int64(labels)
     cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
-        logits, labels, name='xentropy')
+        logits=logits, labels=labels, name='xentropy')
     loss_value = tf.reduce_mean(cross_entropy, name='xentropy_mean')
     return loss_value
 
@@ -76,7 +76,7 @@ def soft_xe(x, y, alpha, num_classes_in_batch, sess=None):
         sqdif = tf.reduce_sum(tf.squared_difference(tf.expand_dims(clique, 1), clique), 2)
         tf.Print(sqdif, [sqdif], 'This is sqdif')
         idxs_centroid.append(tf.to_int32(tf.argmin(tf.reduce_sum(sqdif, 0), 0)))
-    r = tf.pack([x_aux[idxs_centroid[_i]] for _i, x_aux in enumerate(clique_examples)])
+    r = tf.stack([x_aux[idxs_centroid[_i]] for _i, x_aux in enumerate(clique_examples)])
 
     # Compute distance from all points to all clusters representatives
     dr = tf.squared_difference(tf.expand_dims(x, 1), r)
@@ -127,7 +127,7 @@ def training_stl(net, loss, base_lr=None):
     Returns:
       train_op: The Op for training.
     """
-    tf.scalar_summary(loss.op.name, loss)
+    tf.summary.scalar(loss.op.name, loss)
     # WARNING: initial_accumulator_value in caffe's AdaGrad is probably 0.0
     update_ops = net.graph.get_collection(tf.GraphKeys.UPDATE_OPS)
     assert len(update_ops) > 0
@@ -153,7 +153,7 @@ def training_sgd(net, loss, base_lr=None):
     Returns:
       train_op: The Op for training.
     """
-    tf.scalar_summary(loss.op.name, loss)
+    tf.summary.scalar(loss.op.name, loss)
     optimizer = tf.train.MomentumOptimizer(learning_rate=base_lr, momentum=0.9)
     op = optimizer.minimize(loss=loss)
     return op
@@ -175,7 +175,7 @@ def training_stl_eval(net, loss, base_lr=None):
     Returns:
       train_op: The Op for training.
     """
-    tf.scalar_summary(loss.op.name, loss)
+    tf.summary.scalar(loss.op.name, loss)
     # WARNING: initial_accumulator_value in caffe's AdaGrad is probably 0.0
     update_ops = net.graph.get_collection(tf.GraphKeys.UPDATE_OPS)
     assert len(update_ops) > 0
@@ -203,7 +203,7 @@ def training(net, loss_op, base_lr=None, fc_lr_mult=1.0, conv_lr_mult=1.0, **par
     Returns:
       train_op: The Op for training.
     """
-    tf.scalar_summary(loss_op.op.name, loss_op)
+    tf.summary.scalar(loss_op.op.name, loss_op)
     # WARNING: initial_accumulator_value in caffe's AdaGrad is probably 0.0
     conv_optimizer = tf.train.AdagradOptimizer(base_lr * conv_lr_mult,
                                                initial_accumulator_value=0.0000001)
@@ -405,7 +405,7 @@ def training_convnet(net, loss_op, fc_lr, conv_lr, optimizer_type='adagrad',
                     grad_norm_op = tf.nn.l2_loss(grad, name=format(v.name[:-2]))
                     tf.add_to_collection('grads', grad_norm_op)
                     if trace_gradients:
-                        tf.scalar_summary(grad_norm_op.name, grad_norm_op)
+                        tf.summary.scalar(grad_norm_op.name, grad_norm_op)
 
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):

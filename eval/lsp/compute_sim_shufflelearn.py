@@ -66,7 +66,7 @@ def main(argv):
     }
 
     net = tfext.fcconvnetv2.FcConvnetV2(**net_params)
-    net.sess.run(tf.initialize_all_variables())
+    net.sess.run(tf.global_variables_initializer())
     # net.restore_from_snapshot('/export/home/asanakoy/workspace/OlympicSports/cnn/convnet_joint_categories_scratch/checkpoint-180000',
     #                           5, restore_iter_counter=True)
     net.restore_from_alexnet_snapshot('/export/home/asanakoy/workspace/tfprj/data/shuffle_learn/shuffle_learn.tf', 5)

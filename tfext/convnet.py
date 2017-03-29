@@ -101,7 +101,7 @@ class Convnet(object):
 
             fc6_w = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "fc6/weight:0")[0]
             fc6_b = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "fc6/bias:0")[0]
-            self.reset_fc6_op = tf.initialize_variables([fc6_w, fc6_b], name='reset_fc6')
+            self.reset_fc6_op = tf.variables_initializer([fc6_w, fc6_b], name='reset_fc6')
 
         self.graph = tf.get_default_graph()
         assert len(self.graph.get_collection(tf.GraphKeys.UPDATE_OPS)) > 0, 'Must contain batch normalization update ops!'
@@ -146,7 +146,7 @@ class Convnet(object):
                 print 'Convnet::Restoring Everything (6 layers)'
                 saver = tf.train.Saver()
                 if not restore_iter_counter:
-                    tf.initialize_variables(self.global_iter_counter)
+                    tf.variables_initializer(self.global_iter_counter)
             saver.restore(self.sess, snapshot_path)
 
     def restore_from_alexnet_snapshot(self, snapshot_path, num_layers):
@@ -227,10 +227,10 @@ class Convnet(object):
         if group == 1:
             conv = convolve(input_tensor, kernel)
         else:
-            input_groups = tf.split(3, group, input_tensor)
-            kernel_groups = tf.split(3, group, kernel)
+            input_groups = tf.split(axis=3, num_or_size_splits=group, value=input_tensor)
+            kernel_groups = tf.split(axis=3, num_or_size_splits=group, value=kernel)
             output_groups = [convolve(i, k) for i, k in zip(input_groups, kernel_groups)]
-            conv = tf.concat(3, output_groups)
+            conv = tf.concat(axis=3, values=output_groups)
         # TODO: no need to reshape?
         return tf.reshape(tf.nn.bias_add(conv, biases), [-1] + conv.get_shape().as_list()[1:],
                           name='conv')

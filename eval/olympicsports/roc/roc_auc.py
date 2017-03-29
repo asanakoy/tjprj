@@ -119,7 +119,7 @@ def compute_roc_auc_from_sim(argv, path_sim_matrix=None, is_quiet=False):
     dataset_root = '/export/home/asanakoy/workspace01/datasets/OlympicSports/'
 
     if path_sim_matrix is None:
-        suffix = 'with_bn_fc7'
+        suffix = ''
         path_sim_matrix = join(dataset_root, 'sim/tf/', suffix, category,
                                'simMatrix_{}_tf_0.1conv_1fc_{}iter_{}_fc7_zscores.mat'.format(
                                    category, suffix + '_' if len(suffix) else '', iter_id))
@@ -164,15 +164,30 @@ def run_all_cat():
     categories = sorted(categories)
     for cat in categories:
         try:
-            path_sim_matrix = '/export/home/asanakoy/workspace/OlympicSports/sim/tf/{0}/simMatrix_{0}_aug_less_aggressive__rounds_1_fc7_None'.format(cat)
+            path_sim_matrix = '/export/home/asanakoy/workspace/OlympicSports/sim/tf/{0}/simMatrix_{0}_tf_0.1conv_1fc_iter_20000_fc7_zscores.mat'.format(cat)
+            # path_sim_matrix = '/export/home/mbautist/Desktop/workspace/cnn_similarities/compute_similarities/sim_matrices/imagenet/simMatrix_' + cat + '_imagenet-alexnet_iter_0_fc7.mat'
             compute_roc_auc_from_sim([cat], path_sim_matrix=path_sim_matrix, is_quiet=True)
         except IOError as e:
-            # print e
+            print e
             print cat
 
 
 if __name__ == '__main__':
-    # run_all_cat()
+    run_all_cat()
     # compute_roc_auc_from_sim(['long_jump'], path_sim_matrix='/export/home/mbautist/Desktop/long_jump/simMatrix_long_jump_tf_0.1conv_1fc_growingiter2_iter_20000_fc7_zscores.mat')
-    compute_roc_auc_from_sim(['long_jump'], path_sim_matrix='/export/home/mbautist/Desktop/fixed_magnet.mat')
+    # compute_roc_auc_from_sim(['discus_throw'], path_sim_matrix='/export/home/asanakoy/workspace/OlympicSports/sim/tf/discus_throw/simMatrix_discus_throw_1_rounds_3_rounds_20k_aug_fc7_zscores.mat')
+    # compute_roc_auc_from_sim(['long_jump'],
+    #                          path_sim_matrix='/export/home/asanakoy/workspace/OlympicSports/sim/tf/long_jump/simMatrix_long_jump_tf_0.1conv_1fc_iter_20000_fc7_zscores.mat')
     # compute_roc_auc_from_sim(['long_jump'])
+
+    # results = list()
+    # category = 'long_jump'
+    # sim_mats = glob.glob('/export/home/asanakoy/workspace/OlympicSports/sim/tf/long_jump/*.mat')
+    # sim_mats.sort()
+    # for sim_path in sim_mats:
+    #     auc = compute_roc_auc_from_sim([category], path_sim_matrix=sim_path)
+    #     results.append((os.path.split(sim_path)[1], auc))
+    #
+    # print '======'
+    # for r in results:
+    #     print r[0], r[1]
