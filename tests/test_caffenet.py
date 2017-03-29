@@ -34,7 +34,7 @@ def test_feed_forward(net):
 
 if __name__ == '__main__':
     params = {
-        'init_model': os.path.join(MODELS_DIR, 'bvlc_reference_caffenet/weights.npy'),
+        'init_model': os.path.join(MODELS_DIR, 'bvlc_reference_caffenet/caffenet_weights.npy'),
         'num_classes': 1000,
         'device_id': '/gpu:0',
         'num_layers_to_init': 8,
