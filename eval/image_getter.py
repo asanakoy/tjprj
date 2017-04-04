@@ -36,7 +36,8 @@ class ImageGetterFromMat:
             RGB channel order if self.rgb_batch == True
             BGR channel order otherwise
         """
-        assert len(resize_shape) == 2, 'resize_shape must be of len 2: (h, w)!'
+        assert resize_shape is None or \
+               len(resize_shape) == 2, 'resize_shape must be of len 2: (h, w)!'
         assert mean is None or (len(mean.shape) == 3 and mean.shape[2] == 3)
         batch = self.images_ref[indxs, :, :, :][...]  # matlab format CxWxH x N
         batch = batch.transpose((0, 3, 2, 1))  # N x HxWxC matrix
@@ -86,7 +87,8 @@ class ImageGetterFromPaths:
             RGB channel order if self.rgb_batch == True
             BGR channel order otherwise
         """
-        assert len(resize_shape) == 2, 'resize_shape must be of len 2: (h, w)!'
+        assert resize_shape is None or \
+               len(resize_shape) == 2, 'resize_shape must be of len 2: (h, w)!'
         assert mean is None or (len(mean.shape) == 3 and mean.shape[2] == 3)
 
         if resize_shape is None:

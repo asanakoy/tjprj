@@ -100,20 +100,31 @@ def compute_sim_and_save(sim_output_path, norm_method, net=None, **params):
 
 def extract_features(flipped, net=None, frame_ids=None, layer_names=None,
                      image_getter=None, im_shape=(227, 227), batch_size=128, mean=None,
-                     verbose=2, should_reshape_vectors=True,
+                     verbose=2, should_reshape_vectors=True, input_pl_name='input/x',
+                     is_phase_train_pl_name='input/is_phase_train',
                      **params):
     """
     Extract features from the network.
 
     Args:
         flipped: are frames flipped?
-        net: if not None it will use this network to extract the features,
-          otherwise create new net and restore from teh snapshot
+        net: Network object with fields:
+             sess - tensorflow session,
+             fields corresponding to layers with names as elements of $layer_names;
+          if not None it will use this network to extract the features,
+          otherwise create new Alexnet net and restore from the snapshot (snapshot_path).
         frame_ids: if None extract from all frames,
           if a list of frames - extract features only for them
         layer_names: list of layer names to use for extraction
         image_getter: image getter object from eval/image_getter.py
+        im_shape: retrieve from images of this shape from $image_getter
+        batch_size: batch size to use for feature extraction
         mean: mean image, must be (h, w, 3) in HxWxC RGB
+        verbose: verbosity level from 0 to 100
+        input_pl_name: input placeholder name
+        is_phase_train_pl_name: name of is_phase_train placeholder,
+          If not None the placeholder will be replaced with False (not training),
+          If None than not use this placeholder in feed dict.
         should_reshape_vectors: reshape features to the plain 1xD vectors
         params: optional parameters for net if net=None:
                     snapshot_path,
@@ -162,10 +173,9 @@ def extract_features(flipped, net=None, frame_ids=None, layer_names=None,
         if flipped:
             batch = batch[:, :, ::-1, :]
 
-        feed_dict = {
-            'input/x:0': batch,
-            'input/is_phase_train:0': False
-        }
+        feed_dict = {input_pl_name + ':0': batch}
+        if is_phase_train_pl_name is not None:
+            feed_dict[is_phase_train_pl_name + ':0'] = False
 
         features = net.sess.run(tensors_to_get, feed_dict=feed_dict)
         pos_begin = batch_size * step
