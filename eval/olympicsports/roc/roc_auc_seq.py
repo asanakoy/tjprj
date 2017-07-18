@@ -47,6 +47,20 @@ def compute_similarity(stacked_sim_matrix, seq_names, frame_id_1, frame_id_2, fl
 
 def compute_similarity_middle(stacked_sim_matrix, seq_names, frame_id_1, frame_id_2, flipval,
                               max_clip_radius=4):
+    """
+
+    Args:
+        stacked_sim_matrix:
+        seq_names:
+        frame_id_1:
+        frame_id_2:
+        flipval:
+        max_clip_radius: take (max_clip_radius - 1) frames before
+            and (max_clip_radius - 1) after the current frame from teh same clip.
+
+    Returns:
+
+    """
     ids = [frame_id_1, frame_id_2]
     clips = list()
     clip_radius = max_clip_radius
@@ -65,11 +79,22 @@ def compute_similarity_middle(stacked_sim_matrix, seq_names, frame_id_1, frame_i
     assert len(clips[0]) == len(clips[1]) == 1 + (clip_radius - 1) * 2
     sim_values = list()
     for i, j in zip(*clips):
-        sim_values.append(stacked_sim_matrix[i, j, flipval])
+        sim_values.append(stacked_sim_matrix[i, j, int(flipval)])
     return np.mean(sim_values)
 
 
 def clip_refine_sim(sim, seq_names, d, max_clip_radius=4):
+    """
+    Change in original matrix only the values which correspond to labeled pairs (for speed reasons).
+    Args:
+        sim:
+        seq_names:
+        d:
+        max_clip_radius:
+
+    Returns:
+
+    """
     stacked_sim_matrix = np.stack([sim['simMatrix'], sim['simMatrix_flip']], axis=2)
     result_matrix = np.zeros_like(stacked_sim_matrix, dtype=np.float32)
 
@@ -168,7 +193,7 @@ def run_all_cat():
     for cat in categories:
         try:
             # path_sim_matrix = '/export/home/asanakoy/workspace/OlympicSports/sim/tf/{0}/simMatrix_{0}_tf_0.1conv_1fc_iter_20000_fc7_zscores.mat'.format(cat)
-            path_sim_matrix = '/export/home/mbautist/Desktop/workspace/cnn_similarities/compute_similarities/sim_matrices/CliqueCNN/simMatrix_{0}_{0}_LR_0.001_M_0.9_BS_128_iter_20000_fc7_prerelu.mat'.format(cat)
+            path_sim_matrix = '/export/home/asanakoy/workspace/OlympicSports/sim/sim_matrices_miguel/CliqueCNN/simMatrix_{0}_{0}_LR_0.001_M_0.9_BS_128_iter_20000_fc7_prerelu.mat'.format(cat)
             roc_auc = compute_roc_auc_from_sim([cat], path_sim_matrix=path_sim_matrix, is_quiet=True)
             aucs.append(roc_auc)
         except IOError as e:
