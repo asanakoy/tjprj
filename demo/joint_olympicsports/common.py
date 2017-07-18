@@ -121,8 +121,8 @@ def set_summary_tracking(graph, track_moving_averages):
     with graph.as_default():
         if track_moving_averages:
             movin_avg_vars = [v for v in tf.get_collection(tf.GraphKeys.VARIABLES) if 'moving_' in v.name]
-            tf.summary.scalar(['moving/' + v.name for v in movin_avg_vars],
-                              [tf.nn.l2_loss(v) for v in movin_avg_vars])
+            for v in movin_avg_vars:
+                tf.summary.scalar('moving/' + v.name, tf.nn.l2_loss(v))
 
 
 def create_loss_op(net, loss_type):
@@ -163,8 +163,12 @@ def setup_alexnet_network(num_classes, loss_type, batch_size, optimizer_type,
 
     conv5w_norm = tf.nn.l2_loss(net.graph.get_tensor_by_name('conv5/weight:0'))
     conv5b_norm = tf.nn.l2_loss(net.graph.get_tensor_by_name('conv5/bias:0'))
-    tf.summary.scalar(['loss', 'batch_accuracy', 'conv_lr', 'fc_lr', 'conv5w_norm', 'conv5b_norm'],
-                      [loss_op, accuracy, conv_lr_pl, fc_lr_pl, conv5w_norm, conv5b_norm])
+    tf.summary.scalar('loss', loss_op)
+    tf.summary.scalar('batch_accuracy', accuracy)
+    tf.summary.scalar('conv_lr', conv_lr_pl)
+    tf.summary.scalar('fc_lr', fc_lr_pl)
+    tf.summary.scalar('conv5w_norm', conv5w_norm)
+    tf.summary.scalar('conv5b_norm', conv5b_norm)
 
     net.sess.run(tf.global_variables_initializer())
     if snapshot_path_to_restore is not None:
@@ -194,8 +198,12 @@ def setup_convnet_network(network_class, num_classes, loss_type, batch_size,
 
     conv5w_norm = tf.nn.l2_loss(net.graph.get_tensor_by_name('conv5/weight:0'))
     conv5b_norm = tf.nn.l2_loss(net.graph.get_tensor_by_name('conv5/bias:0'))
-    tf.summary.scalar(['loss', 'batch_accuracy', 'conv_lr', 'fc_lr', 'conv5w_norm', 'conv5b_norm'],
-                      [loss_op, accuracy, conv_lr_pl, fc_lr_pl, conv5w_norm, conv5b_norm])
+    tf.summary.scalar('loss', loss_op)
+    tf.summary.scalar('batch_accuracy', accuracy)
+    tf.summary.scalar('conv_lr', conv_lr_pl)
+    tf.summary.scalar('fc_lr', fc_lr_pl)
+    tf.summary.scalar('conv5w_norm', conv5w_norm)
+    tf.summary.scalar('conv5b_norm', conv5b_norm)
 
     net.sess.run(tf.global_variables_initializer())
     # init with alexnet if necessary
