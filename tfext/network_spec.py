@@ -92,6 +92,7 @@ def soft_xe(x, y, alpha, num_classes_in_batch, sess=None):
     std_normalizer = -1.0 / (2.0 * sigma ** 2.0)
 
     # Compute numerator
+    # FIXME: tf.exp(std_normalizer * max(0, (d_xi_ri - alpha)))
     numerator = tf.exp(std_normalizer * d_xi_ri - alpha)
 
     # Compute denominator
@@ -362,8 +363,6 @@ def training_warmup_stl(net, loss_op, lower_lr, upper_lr):
         fc_tran_op = fc_optimizer.apply_gradients(zip(fc_grads, variable_vars),
                                                   global_step=net.global_iter_counter)
     return tf.group(conv_tran_op, fc_tran_op)
-
-
 
 
 def training_convnet(net, loss_op, fc_lr, conv_lr, optimizer_type='adagrad',
