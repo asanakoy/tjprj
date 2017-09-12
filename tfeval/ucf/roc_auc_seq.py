@@ -11,7 +11,7 @@ import os
 import glob
 from tqdm import tqdm
 
-from eval.olympicsports.roc.roc_auc import get_roc_auc, covert_labels_to_dict, compute_interpolated_roc_auc
+from tfeval.olympicsports.roc.roc_auc import get_roc_auc, covert_labels_to_dict, compute_interpolated_roc_auc
 
 
 def read_seq_names(dataset, category):

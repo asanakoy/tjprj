@@ -14,8 +14,8 @@ import tfext.fcconvnetv2
 import tfext.utils
 from trainhelper import trainhelper
 import batch_loader_with_prefetch
-import eval.olympicsports.roc.roc_from_net
-import eval.olympicsports.utils
+import tfeval.olympicsports.roc.roc_from_net
+import tfeval.olympicsports.utils
 import helper
 from helper import BatchManager
 from tqdm import tqdm
@@ -159,7 +159,7 @@ def setup_alexnet_network(num_classes, loss_type, batch_size, optimizer_type,
     accuracy = tf.cast(eval_correct_top1, tf.float32) / \
                tf.constant(batch_size, dtype=tf.float32)
 
-    saver = tf.train.Saver()
+    saver = tf.train.Saver(max_to_keep=100)
 
     conv5w_norm = tf.nn.l2_loss(net.graph.get_tensor_by_name('conv5/weight:0'))
     conv5b_norm = tf.nn.l2_loss(net.graph.get_tensor_by_name('conv5/bias:0'))
@@ -194,7 +194,7 @@ def setup_convnet_network(network_class, num_classes, loss_type, batch_size,
     accuracy = tf.cast(eval_correct_top1, tf.float32) / \
                tf.constant(batch_size, dtype=tf.float32)
 
-    saver = tf.train.Saver()
+    saver = tf.train.Saver(max_to_keep=100)
 
     conv5w_norm = tf.nn.l2_loss(net.graph.get_tensor_by_name('conv5/weight:0'))
     conv5b_norm = tf.nn.l2_loss(net.graph.get_tensor_by_name('conv5/bias:0'))
@@ -235,7 +235,7 @@ def setup_convnet_network(network_class, num_classes, loss_type, batch_size,
 
 
 def eval_net(net, category, layer_names, mat_path, mean_path):
-    roc_auc_dict = eval.olympicsports.roc. \
+    roc_auc_dict = tfeval.olympicsports.roc. \
         roc_from_net.compute_roc_auc_from_net(net,
                                               category,
                                               layer_names,
@@ -418,7 +418,7 @@ def run_training(**params):
     params.setdefault('reset_iter_counter', False)
     params.setdefault('recluster_on_init_sim', True)
     checkpoint_prefix = os.path.join(params['output_dir'], 'round_checkpoint')
-    eval.olympicsports.utils.get_joint_categories_mean(params['mean_filepath'], CATEGORIES)
+    tfeval.olympicsports.utils.get_joint_categories_mean(params['mean_filepath'], CATEGORIES)
     assert os.path.exists(params['mean_filepath'])
 
     for clustering_round in range(0, params['num_clustering_rounds']):

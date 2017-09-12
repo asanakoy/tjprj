@@ -1,8 +1,8 @@
 import h5py
 import numpy as np
 from os.path import join
-from eval.image_getter import ImageGetterFromMat
-import eval.features
+from tfeval.image_getter import ImageGetterFromMat
+import tfeval.features
 import h5py
 from clustering.batchgenerator import BatchGenerator
 from clustering.batchsampler import BatchSampler
@@ -51,7 +51,7 @@ def get_sim(net, category, layer_names, **args):
         'image_getter': ImageGetterFromMat(default_params['mat_path']),
         'return_features': default_params['return_features']
     }
-    return eval.features.compute_sim(net=net, **sim_params)
+    return tfeval.features.compute_sim(net=net, **sim_params)
 
 
 def get_step_similarities(step, net, category, dataset, layers, pathtosim=None, pathtosim_avg=None):

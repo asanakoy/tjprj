@@ -13,12 +13,12 @@ import tfext.utils
 import demo.joint_olympicsports.helper
 from joblib import Parallel, delayed
 from demo.joint_olympicsports.common import run_training, get_first_model_path
-import eval.olympicsports.roc.roc_from_net
+import tfeval.olympicsports.roc.roc_from_net
 import tensorflow as tf
 
 
 def eval_net(net, category, layer_names, mat_path, mean_path):
-    roc_auc_dict = eval.olympicsports.roc. \
+    roc_auc_dict = tfeval.olympicsports.roc. \
         roc_from_net.compute_roc_auc_from_net(net,
                                               category,
                                               layer_names,

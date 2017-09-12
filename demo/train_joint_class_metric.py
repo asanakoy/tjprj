@@ -20,7 +20,7 @@ from trainhelper import trainhelper
 import batch_loader_with_prefetch
 import matplotlib.pyplot as plt
 import gc
-import eval.caltech.eval_from_net
+import tfeval.caltech.eval_from_net
 
 
 def get_pathes(category, dataset):

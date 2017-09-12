@@ -4,7 +4,7 @@ import numpy as np
 import multiprocessing
 from tqdm import tqdm
 
-import eval.olympicsports.compute_sim
+import tfeval.olympicsports.compute_sim
 # import train
 # import train_cliquecnn_reassign as train
 import convnet.train as train
@@ -12,7 +12,7 @@ import convnet.train as train
 
 def train_and_compute_sim(gpu_id_str, category):
     train.main([gpu_id_str, category])
-    eval.olympicsports.compute_sim.main([gpu_id_str, category])
+    tfeval.olympicsports.compute_sim.main([gpu_id_str, category])
 
 
 if __name__ == '__main__':

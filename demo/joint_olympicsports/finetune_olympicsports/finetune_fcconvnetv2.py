@@ -18,7 +18,7 @@ def get_pathes(category):
         cat: '/export/home/mbautist/Desktop/workspace/cnn_similarities/datasets/OlympicSports/crops/{}/images.mat'.format(
             cat) for cat in [category]}
 
-    output_dir = '/export/home/asanakoy/workspace/OlympicSports/cnn/ft_fcconvnetv2_joint_categories_scratch_1/{}'.format(category)
+    output_dir = '/export/home/asanakoy/workspace/OlympicSports/cnn/ft_fcconvnetv2_joint_categories_scratch/{}'.format(category)
     # output_dir = os.path.join(os.path.expanduser('~/tmp/tf_test'))
     # mean_path = os.path.join(output_dir, 'mean.npy')
     mean_path = '/export/home/asanakoy/workspace/OlympicSports/cnn/fcconvnetv2_joint_categories_scratch/mean.npy'
@@ -27,7 +27,7 @@ def get_pathes(category):
 
 def main(category):
     if category is None:
-        category = 'bowling'
+        category = 'basketball_layup'
     print category
     images_mat_pathes, mean_path, output_dir = get_pathes(category)
 
@@ -45,8 +45,13 @@ def main(category):
 
         'track_moving_averages': False,
 
-        'test_layers': ['maxpool5', 'fc6', 'fc7', 'fc8'],
-        'snapshot_path_to_restore': '/export/home/asanakoy/workspace/OlympicSports/cnn/fcconvnetv2_joint_categories_scratch/checkpoint-235000',
+        'test_layers': [
+            # 'maxpool5',
+            # 'fc6',
+            'fc7',
+            # 'fc8'
+        ],
+        'snapshot_path_to_restore': '/export/home/asanakoy/workspace/OlympicSports/cnn/fcconvnetv2_joint_categories_scratch/checkpoint-240000',
         'init_model': get_first_model_path(),
         'num_layers_to_init': 0,
         'network': tfext.fcconvnetv2.FcConvnetV2,
@@ -87,28 +92,31 @@ def main(category):
 
 
 if __name__ == '__main__':
-    # main(None)
-    n_jobs = int(sys.argv[1])
-
-    ALL_CATEGORIES = [
-                      'basketball_layup',
-                      'bowling',
-                      'clean_and_jerk',
-                      'discus_throw',
-                      'diving_platform_10m',
-                      'diving_springboard_3m',
-                      'hammer_throw',
-                      'high_jump',
-                      'javelin_throw',
-                      'long_jump',
-                      'pole_vault',
-                      'shot_put',
-                      'snatch',
-                      'tennis_serve',
-                      'triple_jump',
-                      'vault']
-    ALL_CATEGORIES = ALL_CATEGORIES[-1::-1]
-
-    print 'Running {} workers'.format(n_jobs)
-    Parallel(n_jobs=n_jobs)(
-        delayed(main)(cat) for cat in ALL_CATEGORIES)
+    if len(sys.argv) == 1:
+        main(None)
+    else:
+        main(sys.argv[1])
+    # n_jobs = int(sys.argv[1])
+    #
+    # ALL_CATEGORIES = [
+    #                   'basketball_layup',
+    #                   'bowling',
+    #                   'clean_and_jerk',
+    #                   'discus_throw',
+    #                   'diving_platform_10m',
+    #                   'diving_springboard_3m',
+    #                   'hammer_throw',
+    #                   'high_jump',
+    #                   'javelin_throw',
+    #                   'long_jump',
+    #                   'pole_vault',
+    #                   'shot_put',
+    #                   'snatch',
+    #                   'tennis_serve',
+    #                   'triple_jump',
+    #                   'vault']
+    # ALL_CATEGORIES = ALL_CATEGORIES[-1::-1]
+    #
+    # print 'Running {} workers'.format(n_jobs)
+    # Parallel(n_jobs=n_jobs)(
+    #     delayed(main)(cat) for cat in ALL_CATEGORIES)

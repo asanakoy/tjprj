@@ -1,7 +1,7 @@
 from k_shot_classifier import ZeroShotClassifier
 import numpy as np
-import eval.image_getter
-import eval.features
+import tfeval.image_getter
+import tfeval.features
 import scipy.stats as stats
 
 
@@ -15,10 +15,10 @@ def nn_acc(net, category, layer_names, mat_path, mean_path, batch_size):
         'mean': np.load(mean_path),
         'batch_size': batch_size,
         'im_shape': (227, 227),
-        'image_getter': eval.image_getter.ImageGetterFromMat(mat_path)
+        'image_getter': tfeval.image_getter.ImageGetterFromMat(mat_path)
     }
 
-    features = eval.features.extract_features(False, net=net, **feats_params)
+    features = tfeval.features.extract_features(False, net=net, **feats_params)
     features = stats.zscore(features['fc7'])
     zclass = ZeroShotClassifier(features, labels)
     nnn = 10

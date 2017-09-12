@@ -138,6 +138,7 @@ class Convnet(object):
                 fc6_vars = tf.get_collection(tf.GraphKeys.VARIABLES, "fc6")
                 vars_to_restore = tf.get_collection(tf.GraphKeys.VARIABLES)
                 vars_to_restore = [x for x in vars_to_restore if x not in fc6_vars]
+                vars_to_restore = [x for x in vars_to_restore if x != self.global_iter_counter]
                 if restore_iter_counter:
                     vars_to_restore.append(self.global_iter_counter)
                 print 'Convnet::Restoring 5 layers:', [v.name for v in vars_to_restore]

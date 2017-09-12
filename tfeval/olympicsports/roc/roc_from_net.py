@@ -4,9 +4,9 @@ import h5py
 import scipy.stats.mstats as stat
 import scipy.spatial.distance as spdis
 import sklearn
-import eval.image_getter
-import eval.features
-from eval.olympicsports.roc.roc_auc import covert_labels_to_dict, \
+import tfeval.image_getter
+import tfeval.features
+from tfeval.olympicsports.roc.roc_auc import covert_labels_to_dict, \
     compute_interpolated_roc_auc, get_roc_auc
 
 
@@ -62,17 +62,17 @@ def compute_roc_auc_from_net(net, category, layer_names,
         'mean': mean,
         'batch_size': batch_size,
         'im_shape': (227, 227),
-        'image_getter': eval.image_getter.ImageGetterFromMat(mat_path, load_all_in_memory=load_all_in_memory)
+        'image_getter': tfeval.image_getter.ImageGetterFromMat(mat_path, load_all_in_memory=load_all_in_memory)
     }
 
     layer_feats = dict()
 
-    all_features = eval.features.extract_features(False, net=net, frame_ids=used_frame_ids, **feats_params)
+    all_features = tfeval.features.extract_features(False, net=net, frame_ids=used_frame_ids, **feats_params)
     for layer_name, f in all_features.iteritems():
         layer_feats[layer_name] = dict()
         layer_feats[layer_name]['features'] = f
 
-    all_features_flipped = eval.features.extract_features(True, net=net, frame_ids=used_frame_ids, **feats_params)
+    all_features_flipped = tfeval.features.extract_features(True, net=net, frame_ids=used_frame_ids, **feats_params)
     for layer_name, f in all_features_flipped.iteritems():
         layer_feats[layer_name]['features_flipped'] = f
 

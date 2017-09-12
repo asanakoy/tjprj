@@ -21,7 +21,7 @@ import tfext.convnet
 import tfext.utils
 from trainhelper import trainhelper
 import batch_loader_with_prefetch
-import eval.olympicsports.roc.roc_from_net
+import tfeval.olympicsports.roc.roc_from_net
 
 
 def get_pathes(category, dataset, is_bbox_sq):
@@ -91,7 +91,7 @@ def setup_network(**params):
 def eval_net(net, summary_writer, params, global_step=None):
     if global_step is None:
         global_step = net.sess.run(net.global_iter_counter)
-    roc_auc_dict = eval.olympicsports.roc. \
+    roc_auc_dict = tfeval.olympicsports.roc. \
         roc_from_net.compute_roc_auc_from_net(net,
                                               params['category'],
                                               ['maxpool5', 'fc6'],

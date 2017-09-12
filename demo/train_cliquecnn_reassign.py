@@ -19,7 +19,7 @@ import tfext.alexnet
 import tfext.utils
 from trainhelper import trainhelper
 import batch_loader_with_prefetch
-import eval.olympicsports.roc.roc_from_net
+import tfeval.olympicsports.roc.roc_from_net
 
 
 def get_pathes(category, dataset, is_bbox_sq):
@@ -112,7 +112,7 @@ def run_training_current_clustering(**params):
             global_step, _, loss_value = params['net'].sess.run([net.global_iter_counter, params['train_op'], params['loss']], feed_dict=feed_dict)
 
         if step % params['test_step'] == 0 or step + 1 == params['max_iter']:
-            roc_auc = eval.olympicsports.roc. \
+            roc_auc = tfeval.olympicsports.roc. \
                 roc_from_net.compute_roc_auc_from_net(params['net'],
                                                       params['category'],
                                                       ['fc7'],

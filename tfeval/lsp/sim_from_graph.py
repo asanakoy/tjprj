@@ -3,10 +3,10 @@ from collections import namedtuple
 import os
 from os.path import join
 import numpy as np
-from eval.image_getter import ImageGetterFromPaths
-import eval.olympicsports.roc.roc_auc
-import eval.features
-import eval.olympicsports.utils
+from tfeval.image_getter import ImageGetterFromPaths
+import tfeval.olympicsports.roc.roc_auc
+import tfeval.features
+import tfeval.olympicsports.utils
 import glob
 
 Net = namedtuple('Net', ['sess', 'fc7', 'fc6', 'maxpool5', 'conv5', 'graph'])
@@ -52,7 +52,7 @@ if __name__ == '__main__':
 
             sim_output_path = get_sim_output_path(model_name, iteration, params)
 
-            net = eval.features.load_net_with_graph(snapshot_path, gpu_memory_fraction=0.4,
+            net = tfeval.features.load_net_with_graph(snapshot_path, gpu_memory_fraction=0.4,
                                       conv5='conv5/conv5:0',
                                       maxpool5='maxpool5:0',
                                       fc6='fc6/fc6:0',
@@ -60,6 +60,6 @@ if __name__ == '__main__':
 
             print 'Using Snapshot:', snapshot_path
             print 'Output sim matrix to', sim_output_path
-            eval.features.compute_sim_and_save(sim_output_path, net=net, **params)
+            tfeval.features.compute_sim_and_save(sim_output_path, net=net, **params)
             net.sess.close()
             print params['layer_names']

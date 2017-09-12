@@ -1,16 +1,16 @@
 # Copyright (c) 2016 Artsiom Sanakoyeu
 
 # pylint: disable=missing-docstring
-import eval.features
-import eval.olympicsports.utils
+import tfeval.features
+import tfeval.olympicsports.utils
 import tensorflow as tf
 from collections import namedtuple
 import os
 import numpy as np
-from eval.image_getter import ImageGetterFromMat
-import eval.olympicsports.roc.roc_auc
-import eval.features
-import eval.olympicsports.utils
+from tfeval.image_getter import ImageGetterFromMat
+import tfeval.olympicsports.roc.roc_auc
+import tfeval.features
+import tfeval.olympicsports.utils
 from utils import get_sim_pathes
 
 Net = namedtuple('Net', ['sess', 'fc7', 'fc6', 'maxpool5', 'conv5', 'graph'])
@@ -89,7 +89,7 @@ def main(gpu_id, category):
                                )
                 print 'Using Snapshot:', snapshot_path
                 print 'Output sim matrix to', sim_output_path
-                eval.features.compute_sim_and_save(sim_output_path, net=net, **params)
+                tfeval.features.compute_sim_and_save(sim_output_path, net=net, **params)
 
 
 if __name__ == '__main__':

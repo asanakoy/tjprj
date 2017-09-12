@@ -3,5 +3,6 @@
 *.pyc
 .idea
 data/bvlc_alexnet/bvlc_alexnet.caffemodel
+data
 cron
 tags

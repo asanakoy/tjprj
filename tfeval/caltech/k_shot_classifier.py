@@ -58,13 +58,13 @@ class KshotClassifier(object):
             h = svm.LinearSVC(C=c, loss='hinge', multi_class='ovr')
             h.fit(self.samples[idxs_training], self.labels[idxs_training])
             pred_val_labels = h.predict(self.samples[idxs_val])
-            acc_val[idx] = eval.accuracy_score(y_pred=pred_val_labels, y_true=self.labels[idxs_val])
+            acc_val[idx] = tfeval.accuracy_score(y_pred=pred_val_labels, y_true=self.labels[idxs_val])
 
         # Predict and get accuracy on test set
         h = svm.LinearSVC(C=c_range[acc_val.argmax()], loss='hinge', multi_class='ovr')
         h.fit(self.samples[idxs_training], self.labels[idxs_training])
         pred_labels = h.predict(self.samples[idxs_test])
-        acc = eval.accuracy_score(y_pred=pred_labels, y_true=self.labels[idxs_test])
+        acc = tfeval.accuracy_score(y_pred=pred_labels, y_true=self.labels[idxs_test])
         return acc
 
     def ten_fold_cv_train(self, k):
@@ -145,7 +145,7 @@ class ZeroShotClassifier(object):
 
         # Get maximal predicted label for each test sample and return acc
         pred_labels = pred_labels.argmax(axis=1)
-        acc = eval.accuracy_score(y_pred=pred_labels, y_true=self.labels[idxs_test])
+        acc = tfeval.accuracy_score(y_pred=pred_labels, y_true=self.labels[idxs_test])
         return acc
 
     def ten_fold_cv_train(self, n):

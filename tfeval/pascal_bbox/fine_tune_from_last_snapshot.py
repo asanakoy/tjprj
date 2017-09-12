@@ -4,7 +4,7 @@ from tfext import network_spec
 import tfext.alexnet
 import tfext.stlnet
 import tfext.utils
-import eval.stl.eval_aux as eval_aux
+import tfeval.stl.eval_aux as eval_aux
 
 
 
