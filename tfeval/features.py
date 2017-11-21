@@ -99,7 +99,9 @@ def compute_sim_and_save(sim_output_path, norm_method, net=None, **params):
 
 
 def extract_features(flipped, net=None, frame_ids=None, layer_names=None,
-                     image_getter=None, im_shape=(227, 227), batch_size=128, mean=None,
+                     image_getter=None,
+                     is_batch_iterator=False,
+                     im_shape=(227, 227), batch_size=128, mean=None,
                      verbose=2, should_reshape_vectors=True, input_pl_name='input/x',
                      is_phase_train_pl_name='input/is_phase_train',
                      **params):
@@ -117,6 +119,7 @@ def extract_features(flipped, net=None, frame_ids=None, layer_names=None,
           if a list of frames - extract features only for them
         layer_names: list of layer names to use for extraction
         image_getter: image getter object from eval/image_getter.py
+        is_batch_iterator: if image_getter is a batch iterator
         im_shape: retrieve from images of this shape from $image_getter
         batch_size: batch size to use for feature extraction
         mean: mean image, must be (h, w, 3) in HxWxC RGB
@@ -156,32 +159,42 @@ def extract_features(flipped, net=None, frame_ids=None, layer_names=None,
         print 'Tensors to extract:', tensors_to_get
     d = dict()
     if frame_ids is None:
-        frame_ids = np.arange(image_getter.total_num_images())
+        if hasattr(image_getter, 'total_num_images'):
+            frame_ids = np.arange(image_getter.total_num_images())
+        else:
+            frame_ids = np.arange(len(image_getter.dataset))
 
     for layer_name in layer_names:
         tensor = net.__getattribute__(layer_name)
         d[layer_name] = np.zeros([len(frame_ids)] + tensor.get_shape().as_list()[1:])
 
-    num_batches = int(math.ceil(len(frame_ids) / batch_size))
-    if verbose >= 2:
-        print 'Running {} iterations with batch_size={}'.format(num_batches, batch_size)
-    for step, batch_start in tqdm(enumerate(range(0, len(frame_ids), batch_size)),
-                                  total=num_batches, disable=(verbose == 0)):
-        batch_idxs = frame_ids[batch_start:batch_start + batch_size]
-        batch = image_getter.get_batch(batch_idxs, resize_shape=im_shape,
-                                                   mean=mean)
-        if flipped:
-            batch = batch[:, :, ::-1, :]
+    if is_batch_iterator:
+        d = extract_features_from_batch_iterator(net, image_getter, tensors_to_get,
+                                                layer_names, d,
+                                                input_pl_name=input_pl_name,
+                                                is_phase_train_pl_name=is_phase_train_pl_name,
+                                                verbose=verbose)
+    else:
+        num_batches = int(math.ceil(len(frame_ids) / batch_size))
+        if verbose >= 2:
+            print 'Running {} iterations with batch_size={}'.format(num_batches, batch_size)
+        for step, batch_start in tqdm(enumerate(range(0, len(frame_ids), batch_size)),
+                                      total=num_batches, disable=(verbose == 0)):
+            batch_idxs = frame_ids[batch_start:batch_start + batch_size]
+            batch = image_getter.get_batch(batch_idxs, resize_shape=im_shape,
+                                                       mean=mean)
+            if flipped:
+                batch = batch[:, :, ::-1, :]
 
-        feed_dict = {input_pl_name + ':0': batch}
-        if is_phase_train_pl_name is not None:
-            feed_dict[is_phase_train_pl_name + ':0'] = False
+            feed_dict = {input_pl_name + ':0': batch}
+            if is_phase_train_pl_name is not None:
+                feed_dict[is_phase_train_pl_name + ':0'] = False
 
-        features = net.sess.run(tensors_to_get, feed_dict=feed_dict)
-        pos_begin = batch_size * step
-        pos_end = pos_begin + len(batch_idxs)
-        for tensor_id, layer_name in enumerate(layer_names):
-            d[layer_name][pos_begin:pos_end, ...] = features[tensor_id]
+            features = net.sess.run(tensors_to_get, feed_dict=feed_dict)
+            pos_begin = batch_size * step
+            pos_end = pos_begin + len(batch_idxs)
+            for tensor_id, layer_name in enumerate(layer_names):
+                d[layer_name][pos_begin:pos_end, ...] = features[tensor_id]
 
     if should_reshape_vectors:
         for layer_name in layer_names:
@@ -190,3 +203,39 @@ def extract_features(flipped, net=None, frame_ids=None, layer_names=None,
     if is_temp_session:
         net.sess.close()
     return d
+
+
+def extract_features_from_batch_iterator(net, batch_iterator, tensors_to_get,
+                                         layer_names, out_features_dict, input_pl_name='input/x',
+                                         is_phase_train_pl_name='input/is_phase_train',
+                                         verbose=2):
+    """
+    Extract features iterating by batches using batch_iterator.
+    Args:
+        net:
+        batch_iterator:
+        tensors_to_get:
+        layer_names:
+        out_features_dict: dict to store features. Will be modified in-place.
+        input_pl_name:
+        is_phase_train_pl_name:
+        num_batches:
+        verbose:
+
+    Returns: out_features_dict
+    """
+    if verbose >= 2:
+        print 'Running {} iterations (from batch_iterator)'.format(len(batch_iterator))
+    for step, batch in tqdm(enumerate(batch_iterator), total=len(batch_iterator), disable=(verbose == 0)):
+
+        feed_dict = {input_pl_name + ':0': batch}
+        if is_phase_train_pl_name is not None:
+            feed_dict[is_phase_train_pl_name + ':0'] = False
+
+        features = net.sess.run(tensors_to_get, feed_dict=feed_dict)
+        batch_size = len(batch)
+        pos_begin = batch_size * step
+        pos_end = pos_begin + batch_size
+        for tensor_id, layer_name in enumerate(layer_names):
+            out_features_dict[layer_name][pos_begin:pos_end, ...] = features[tensor_id]
+    return out_features_dict
