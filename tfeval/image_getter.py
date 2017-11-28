@@ -1,6 +1,7 @@
 # Copyright (c) 2016 Artsiom Sanakoyeu
 import h5py
 import numpy as np
+from os.path import expanduser
 import PIL
 from PIL import Image
 
@@ -97,8 +98,8 @@ class ImageGetterFromPaths:
         # NxHxWxC RGB matrix
         batch = np.zeros((len(indxs),) + resize_shape + (3,), dtype=np.float32)
         for i, image_idx in enumerate(indxs):
-            image = Image.open(self.image_paths[image_idx]).resize(resize_shape,
-                                                                   PIL.Image.ANTIALIAS)
+            image_path = expanduser(self.image_paths[image_idx])
+            image = Image.open(image_path).resize(resize_shape, PIL.Image.ANTIALIAS)
             batch[i, ...] = np.asarray(image, dtype=np.float32)
 
         if mean is not None:
