@@ -166,7 +166,7 @@ def extract_features(flipped, net=None, frame_ids=None, layer_names=None,
 
     for layer_name in layer_names:
         tensor = net.__getattribute__(layer_name)
-        d[layer_name] = np.zeros([len(frame_ids)] + tensor.get_shape().as_list()[1:])
+        d[layer_name] = np.zeros([len(frame_ids)] + tensor.get_shape().as_list()[1:], dtype=np.float32)
 
     if is_batch_iterator:
         d = extract_features_from_batch_iterator(net, image_getter, tensors_to_get,
