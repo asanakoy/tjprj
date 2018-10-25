@@ -99,8 +99,12 @@ class ImageGetterFromPaths:
         batch = np.zeros((len(indxs),) + resize_shape + (3,), dtype=np.float32)
         for i, image_idx in enumerate(indxs):
             image_path = expanduser(self.image_paths[image_idx])
-            image = Image.open(image_path).resize(resize_shape, PIL.Image.ANTIALIAS)
-            batch[i, ...] = np.asarray(image, dtype=np.float32)
+            image = Image.open(image_path)
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
+            image = image.resize(resize_shape, PIL.Image.ANTIALIAS)
+            image = np.asarray(image, dtype=np.float32)
+            batch[i, ...] = image
 
         if mean is not None:
             batch -= np.tile(mean, (batch.shape[0], 1, 1, 1))
